@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SafeTrack | Operations Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-panel">
+    <div class="brand-mark"><i data-lucide="shield-check"></i></div>
+    <div class="eyebrow">SECURE SHIPMENT MONITORING</div>
+    <h1>SafeTrack</h1>
+    <p class="login-copy">Tamper-evident telemetry and incident monitoring for protected shipments.</p>
+
+    <div class="form-stack">
+      <label>Username
+        <input id="loginUser" value="Rahul Sharma">
+      </label>
+      <label>Shipment Code
+        <input id="loginProductId" value="PRCL-2024-05-21-001" class="mono">
+      </label>
+      <label>Security Passcode
+        <input id="loginPin" value="1234" type="password" class="mono">
+      </label>
+      <button id="loginBtn" class="primary-btn" onclick="handleLogin()">Open Operations Console</button>
+    </div>
+
+    <div class="test-note"></div>
+  </div>
+</div>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- APPLICATION -->
+
+<div id="appShell" class="app-shell hidden">
+
+  <aside class="sidebar">
+    <div>
+      <div class="brand">
+        <div class="brand-mark small"><i data-lucide="shield-check"></i></div>
+        <div>
+          <strong>SafeTrack</strong>
+          <span>Operations Console</span>
+        </div>
+      </div>
+
+      <div class="side-section-title">MONITORING</div>
+      <nav>
+        <button class="nav-link active" onclick="scrollToSection('overview')">
+          <i data-lucide="layout-dashboard"></i> Overview
+        </button>
+        <button class="nav-link" onclick="scrollToSection('telemetry')">
+          <i data-lucide="activity"></i> Live Telemetry
+        </button>
+        <button class="nav-link" onclick="scrollToSection('temperature')">
+          <i data-lucide="chart-line"></i> Temperature
+        </button>
+        <button class="nav-link" onclick="scrollToSection('incidents')">
+          <i data-lucide="triangle-alert"></i> Incidents
+          <span id="navIncidentBadge">0</span>
+        </button>
+      </nav>
+
+      <div class="side-section-title">SYSTEM</div>
+      <div class="system-card">
+        <div class="system-row"><span>API</span><b class="ok-dot">● Online</b></div>
+        <div class="system-row"><span>Sensor stream</span><b id="streamState">Waiting</b></div>
+        <div class="system-row"><span>Refresh</span><b>3 sec</b></div>
+      </div>
+    </div>
+
+    <button class="logout-btn" onclick="handleLogout()">
+      <i data-lucide="log-out"></i> Sign out
+    </button>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">SHIPMENT CONTROL CENTER</div>
+        <h2>Operational Dashboard</h2>
+      </div>
+      <div class="top-actions">
+        <div class="live-pill"></div>
+        <div class="user-chip">
+          <div class="avatar">RS</div>
+          <div><b id="headerUserName">Rahul Sharma</b><small>Operator</small></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- OVERVIEW -->
+      <section id="overview" class="shipment-panel">
+        <div class="shipment-main">
+          <div class="parcel-icon"><i data-lucide="package"></i></div>
+          <div>
+            <div class="eyebrow">ACTIVE SHIPMENT</div>
+            <div class="shipment-title-row">
+              <h3 id="shipmentCode">PRCL-2024-05-21-001</h3>
+              <span id="shipmentStatus" class="status good">IN TRANSIT</span>
+            </div>
+            <p id="shipmentTitle">Protected medical shipment</p>
+          </div>
+        </div>
+
+    <div class="shipment-details">
+
+    <div class="shipment-detail-item">
+        <span>ORIGIN</span>
+        <h1 id="shipOrigin">Mumbai Central Warehouse</h1>
+    </div>
+
+    <div class="shipment-detail-item">
+        <span>DESTINATION</span>
+        <h1 id="shipDestination">Delhi Central Facility</h1>
+    </div>
+
+    <div class="shipment-detail-item">
+        <span>CURRENT HUB</span>
+        <h1 id="shipWarehouse">Mumbai Central Dispatch Hub</h1>
+    </div>
+
+      </section>
+
+      <!-- KPI -->
+      <section class="kpi-grid">
+        <article class="kpi">
+          <div class="kpi-head"><span>Temperature</span><i data-lucide="thermometer"></i></div>
+          <strong id="liveTemp">-- °C</strong>
+          <small id="tempStatus">Waiting for sensor</small>
+          <div class="mini-track"><div id="tempTrack"></div></div>
+        </article>
+
+        <article class="kpi">
+          <div class="kpi-head"><span>Light Exposure</span><i data-lucide="sun"></i></div>
+          <strong id="liveLux">-- LUX</strong>
+          <small id="luxStatus">LDR reading</small>
+          <div class="mini-track"><div id="luxTrack"></div></div>
+        </article>
+
+        <article class="kpi">
+          <div class="kpi-head"><span>Humidity</span><i data-lucide="droplets"></i></div>
+          <strong id="liveHumidity">-- %</strong>
+          <small>Environmental reading</small>
+          <div class="mini-track"><div id="humidityTrack"></div></div>
+        </article>
+
+        <article class="kpi">
+          <div class="kpi-head"><span>Motion / Shock</span><i data-lucide="move-3d"></i></div>
+          <strong id="liveAccel">-- g</strong>
+          <small id="motionStatus">MPU reading</small>
+          <div class="mini-track"><div id="motionTrack"></div></div>
+        </article>
+
+        <article class="kpi seal-kpi">
+          <div class="kpi-head"><span>Seal Status</span><i data-lucide="lock-keyhole"></i></div>
+          <strong id="liveSeal">--</strong>
+          <small id="sealSub">Monitoring</small>
+          <div class="seal-line"></div>
+        </article>
+      </section>
+
+      <!-- CHART ROW -->
+      <section class="section-grid">
+        <article id="temperature" class="panel chart-panel large">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">ENVIRONMENT</div>
+              <h3>Temperature History</h3>
+              <p>Recent sensor readings received from the shipment node</p>
+            </div>
+            <span class="chart-tag">LIVE · 3 SEC</span>
+          </div>
+          <div class="chart-area"><canvas id="temperatureChart"></canvas></div>
+          <div class="chart-foot"><span>Latest reading</span><b id="tempLatestFoot">-- °C</b></div>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="panel-head">
+            <div>
+              <div class="eyebrow">MOTION SENSOR</div>
+              <h3>Shock Activity</h3>
+              <p>Acceleration history</p>
+            </div>
+          </div>
+          <div class="chart-area"><canvas id="motionChart"></canvas></div>
+          <div class="chart-foot"><span>Current acceleration</span><b id="accelLatestFoot">-- g</b></div>
+        </article>
+      </section>
+
+      <!-- HEALTH STRIP -->
+      <section class="panel safety-panel">
+        <div>
+          <div class="eyebrow">SYSTEM ASSESSMENT</div>
+          <h3>Shipment Safety</h3>
+          <p>Derived from the latest telemetry and tamper conditions.</p>
+        </div>
+        <div class="health-levels">
+          <div id="healthOptimal" class="health-level active"><span>01</span><b>Optimal</b><small>Normal</small></div>
+          <div id="healthDegraded" class="health-level"><span>02</span><b>Degraded</b><small>Attention</small></div>
+          <div id="healthCompromised" class="health-level"><span>03</span><b>Compromised</b><small>Critical</small></div>
+        </div>
+        <div id="healthBadge" class="status good">OPTIMAL</div>
+      </section>
+
+      <!-- INCIDENTS -->
+      <section id="incidents" class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">SECURITY EVENTS</div>
+            <h3>Recent Incident Logs</h3>
+            <p>Abnormal readings and tamper events reported by the backend.</p>
+          </div>
+          <span id="incidentSummary" class="status neutral">0 INCIDENTS</span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>TIME</th><th>SEVERITY</th><th>EVENT</th><th>LOCATION</th><th>DETAILS</th></tr></thead>
+            <tbody id="incidentTableBody"></tbody>
+          </table>
+          <div id="incidentEmpty" class="empty-state">No incidents detected.</div>
+        </div>
+      </section>
+
+      <!-- TELEMETRY -->
+      <section id="telemetry" class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="eyebrow">DEVICE STREAM</div>
+            <h3>Live Telemetry Feed</h3>
+            <p>Latest records from the simulated ESP32 / sensor node.</p>
+          </div>
+          <div class="stream-indicator"><span></span> Receiving</div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>EVENT ID</th><th>TIMESTAMP</th><th>TEMP</th><th>HUMIDITY</th><th>LIGHT</th><th>ACCEL</th><th>HEALTH</th><th>SEAL</th></tr></thead>
+            <tbody id="telemetryTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer>SafeTrack · SIH Phase 1 · FastAPI + ESP32 Telemetry</footer>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+<script>if (window.lucide) lucide.createIcons();</script>
+</body>
+</html>
