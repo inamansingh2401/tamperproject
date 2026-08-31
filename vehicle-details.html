@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeTrack - Vehicle Cargo Products</title>
+    
+    <!-- Google Fonts (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        sidebar: {
+                            bg: '#141824',
+                            hover: '#1e2336',
+                            active: '#2563eb',
+                            border: '#1f263b',
+                            text: '#94a3b8',
+                            textActive: '#ffffff'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-[#f8fafc] text-slate-800 font-sans min-h-screen flex antialiased selection:bg-blue-500 selection:text-white dark:bg-slate-900 dark:text-slate-100 transition-colors duration-200">
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- MAIN WRAPPER -->
+    <div class="flex w-full min-h-screen">
+        
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="w-64 bg-sidebar-bg text-sidebar-text flex flex-col justify-between shrink-0 border-r border-sidebar-border select-none z-40 transition-all duration-300">
+            <div>
+                <!-- Brand Header -->
+                <div class="px-6 py-5 flex items-center gap-3 border-b border-sidebar-border/60">
+                    <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/30 shrink-0">
+                        <i data-lucide="shield-check" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-white text-base leading-tight tracking-tight">SafeTrack</h1>
+                        <p class="text-[11px] text-slate-400 font-medium">Cargo Management</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Section -->
+                <div class="px-4 py-4 space-y-6">
+                    <div>
+                        <p class="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Main Menu</p>
+                        <nav class="space-y-1 text-xs font-medium">
+                            <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <i data-lucide="arrow-left" class="w-4 h-4 text-blue-400 shrink-0"></i>
+                                <span class="font-semibold text-blue-400">Back to Dashboard</span>
+                            </a>
+                            <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20 font-semibold transition-all">
+                                <i data-lucide="truck" class="w-4 h-4 text-white shrink-0"></i>
+                                <span>Vehicle Products</span>
+                            </a>
+                            <a href="index.html" class="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="alert-triangle" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                    <span>Alerts & Incidents</span>
+                                </div>
+                                <span class="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">7</span>
+                            </a>
+                            <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <i data-lucide="bar-chart-3" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                <span>Telemetry Reports</span>
+                            </a>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile User Card Footer -->
+            <div class="p-4 border-t border-sidebar-border/60">
+                <div class="flex items-center justify-between p-2.5 rounded-xl bg-sidebar-hover/60 hover:bg-sidebar-hover cursor-pointer transition-all border border-sidebar-border/40">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-md">
+                            AS
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-white leading-tight">Admin Super</p>
+                            <p class="text-[10px] text-slate-400 leading-tight">Super Administrator</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT WORKSPACE -->
+        <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+            
+            <!-- TOP NAVBAR -->
+            <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700/60 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <a href="index.html" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors" title="Back to Dashboard">
+                        <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                    </a>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 id="headerVehicleId" class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">PRCL-2024-05-21-001</h2>
+                            <span id="headerVehicleStatus" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-400 dark:border-emerald-800">
+                                In Transit
+                            </span>
+                        </div>
+                        <p id="headerVehicleRoute" class="text-xs text-slate-500 dark:text-slate-400">Cargo Products & Real-time Telemetry Monitor</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <!-- Theme Toggle -->
+                    <button onclick="toggleDarkMode()" class="p-2 bg-slate-50 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 transition-all shadow-sm" title="Toggle Light/Dark Theme">
+                        <i data-lucide="sun" class="w-4 h-4 dark:hidden"></i>
+                        <i data-lucide="moon" class="w-4 h-4 hidden dark:block"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- CONTENT BODY -->
+            <div class="p-6 space-y-6">
+
+                <!-- VEHICLE INFO BANNER -->
+                <div class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div class="space-y-2 z-10">
+                        <div class="flex items-center gap-2 text-blue-300 text-xs font-semibold uppercase tracking-wider">
+                            <i data-lucide="truck" class="w-4 h-4"></i>
+                            <span>Vehicle Cargo Manifest</span>
+                        </div>
+                        <h3 id="bannerTitle" class="text-2xl font-bold text-white tracking-tight">Cargo Contents for Vehicle PRCL-2024-05-21-001</h3>
+                        <div class="flex flex-wrap items-center gap-4 text-xs text-slate-300 pt-1">
+                            <span class="flex items-center gap-1.5"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-blue-400"></i> <strong class="text-white">Origin:</strong> <span id="infoOrigin">Mumbai Central Warehouse</span></span>
+                            <span class="flex items-center gap-1.5"><i data-lucide="navigation" class="w-3.5 h-3.5 text-emerald-400"></i> <strong class="text-white">Destination:</strong> <span id="infoDestination">Delhi Central Facility</span></span>
+                            <span class="flex items-center gap-1.5"><i data-lucide="user" class="w-3.5 h-3.5 text-amber-400"></i> <strong class="text-white">Driver:</strong> <span id="infoDriver">Rajesh Kumar (ID: DRV-882)</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Right Quick Export Button -->
+                    <div class="z-10 flex items-center gap-3 shrink-0">
+                        <button onclick="showToast('Exporting manifest PDF...', 'success')" class="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl text-xs font-bold text-white transition-all backdrop-blur-md shadow-lg">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            <span>Export Manifest</span>
+                        </button>
+                    </div>
+
+                    <!-- Decorative background blur circle -->
+                    <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
+                </div>
+
+                <!-- TELEMETRY CARDS (5 Metrics including Temp, Light, Humidity, Shock) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    
+                    <!-- 1. Total Products Card -->
+                    <div class="bg-white dark:bg-slate-800 p-4.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Products</span>
+                            <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                                <i data-lucide="boxes" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <div id="statTotalProducts" class="text-2xl font-bold text-slate-900 dark:text-white">4 Products</div>
+                            <p id="statTotalQty" class="text-[11px] text-slate-400 font-medium mt-0.5">1,100 total units</p>
+                        </div>
+                    </div>
+
+                    <!-- 2. Temperature (°C) Card -->
+                    <div class="bg-white dark:bg-slate-800 p-4.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Temperature</span>
+                            <div class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                                <i data-lucide="thermometer" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <div id="statTemp" class="text-2xl font-bold text-slate-900 dark:text-white">4.2 °C</div>
+                            <p class="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                <span>Cold Chain Nominal</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- 3. Light Level (Lux) Card -->
+                    <div class="bg-white dark:bg-slate-800 p-4.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Light Exposure</span>
+                            <div class="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                                <i data-lucide="sun" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <div id="statLight" class="text-2xl font-bold text-slate-900 dark:text-white">0 Lux</div>
+                            <p class="text-[11px] text-slate-400 font-medium mt-0.5">Enclosed / Sealed</p>
+                        </div>
+                    </div>
+
+                    <!-- 4. Humidity (%) Card -->
+                    <div class="bg-white dark:bg-slate-800 p-4.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Humidity</span>
+                            <div class="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                                <i data-lucide="droplets" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <div id="statHumidity" class="text-2xl font-bold text-slate-900 dark:text-white">45% RH</div>
+                            <p class="text-[11px] text-slate-400 font-medium mt-0.5">Optimal Range (30-60%)</p>
+                        </div>
+                    </div>
+
+                    <!-- 5. Shock Types & Events Card -->
+                    <div class="bg-white dark:bg-slate-800 p-4.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Shock Status</span>
+                            <div class="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                                <i data-lucide="activity" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <div id="statShock" class="text-lg font-bold text-slate-900 dark:text-white truncate">Normal (0.2g)</div>
+                            <p class="text-[11px] text-slate-400 font-medium mt-0.5">Accelerometer Active</p>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- PRODUCTS TABLE CARD -->
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700 shadow-sm overflow-hidden space-y-0">
+                    
+                    <!-- Toolbar / Header -->
+                    <div class="p-5 border-b border-slate-100 dark:border-slate-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900 dark:text-white">Carried Products Manifest</h3>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Detailed telemetry and sensor data per product unit inside this vehicle</p>
+                        </div>
+
+                        <div class="flex items-center gap-2.5">
+                            <!-- Search Product -->
+                            <div class="relative w-56">
+                                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                                <input type="text" id="productSearchInput" onkeyup="handleProductSearch()" placeholder="Search products, ID, category..." class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+
+                            <!-- Filter Product Status -->
+                            <div class="relative">
+                                <button onclick="toggleProductFilterMenu()" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">
+                                    <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-slate-500"></i>
+                                    <span>Filter</span>
+                                </button>
+                                <div id="productFilterPopover" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 p-2 text-xs space-y-1">
+                                    <button onclick="filterProducts('all')" class="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium">Show All</button>
+                                    <button onclick="filterProducts('Optimal')" class="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-emerald-600 font-medium">Optimal Only</button>
+                                    <button onclick="filterProducts('Warning')" class="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-amber-600 font-medium">Warning Only</button>
+                                    <button onclick="filterProducts('Critical')" class="w-full text-left px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-rose-600 font-medium">Critical Shock Only</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50/70 dark:bg-slate-700/40 text-slate-400 dark:text-slate-400 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-100 dark:border-slate-700">
+                                <tr>
+                                    <th class="px-5 py-3.5">Product Name & Shipment ID</th>
+                                    <th class="px-5 py-3.5">Category</th>
+                                    <th class="px-5 py-3.5">Quantity</th>
+                                    <th class="px-5 py-3.5">Temp (°C)</th>
+                                    <th class="px-5 py-3.5">Light (Lux)</th>
+                                    <th class="px-5 py-3.5">Humidity (%)</th>
+                                    <th class="px-5 py-3.5">Shock Type & Level</th>
+                                    <th class="px-5 py-3.5">Status</th>
+                                    <th class="px-5 py-3.5 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium text-slate-700 dark:text-slate-200">
+                                <!-- Dynamically populated via vehicle-details.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: PRODUCT TELEMETRY CHART LOG -->
+    <div id="productModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 w-full max-w-xl shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                <h3 id="modalProductTitle" class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <i data-lucide="package" class="w-5 h-5 text-blue-600"></i>
+                    Product Sensor Log
+                </h3>
+                <button onclick="closeProductModal()" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div id="modalProductDetails" class="space-y-4 text-xs">
+                <!-- Dynamic Content -->
+            </div>
+
+            <div class="pt-2 flex justify-end">
+                <button onclick="closeProductModal()" class="px-4 py-2 bg-blue-600 text-white rounded-xl font-semibold">Close Details</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Code -->
+    <script src="vehicle-details.js"></script>
+</body>
+</html>
