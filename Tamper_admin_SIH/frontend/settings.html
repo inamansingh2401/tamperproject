@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeTrack Admin Console - System Settings</title>
+
+    <!-- Google Fonts (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        sidebar: {
+                            bg: '#141824',
+                            hover: '#1e2336',
+                            active: '#2563eb',
+                            border: '#1f263b',
+                            text: '#94a3b8',
+                            textActive: '#ffffff'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-[#f8fafc] text-slate-800 font-sans min-h-screen flex antialiased selection:bg-blue-500 selection:text-white dark:bg-slate-900 dark:text-slate-100 transition-colors duration-200">
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- MAIN LAYOUT WRAPPER -->
+    <div class="flex w-full min-h-screen">
+
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="w-64 bg-sidebar-bg text-sidebar-text flex flex-col shrink-0 border-r border-sidebar-border select-none z-40 transition-all duration-300">
+            <div>
+                <!-- Brand Header -->
+                <div class="px-6 py-5 flex items-center gap-3 border-b border-sidebar-border/60">
+                    <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/30 shrink-0">
+                        <i data-lucide="shield-check" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-white text-base leading-tight tracking-tight">SafeTrack</h1>
+                        <p class="text-[11px] text-slate-400 font-medium">Admin Console</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Section -->
+                <div class="px-4 py-4 space-y-6">
+                    <div>
+                        <p class="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Main Menu</p>
+                        <nav class="space-y-1 text-xs font-medium">
+                            <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <i data-lucide="layout-grid" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                <span>Dashboard</span>
+                            </a>
+                            <a href="shipments.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <i data-lucide="package" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                <span>Shipments</span>
+                            </a>
+                            <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <i data-lucide="truck" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                <span>Vehicles</span>
+                            </a>
+                            <a href="alerts.html" class="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="alert-triangle" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                    <span>Alerts & Incidents</span>
+                                </div>
+                                <span class="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">7</span>
+                            </a>
+                            <a href="reports.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <i data-lucide="bar-chart-3" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                <span>Reports</span>
+                            </a>
+                            <a href="users.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <i data-lucide="users" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                <span>Users & Roles</span>
+                            </a>
+                            <a href="settings.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20 font-semibold transition-all">
+                                <i data-lucide="settings" class="w-4 h-4 text-white shrink-0"></i>
+                                <span>Settings</span>
+                            </a>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Footer -->
+            <div class="mt-auto">
+                <div class="p-4 border-t border-sidebar-border/60">
+                    <div class="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-sidebar-hover/60 hover:bg-rose-500/10 cursor-pointer transition-all border border-sidebar-border/40" onclick="SafeTrackAuth.logout()" title="Sign out">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
+                                AS
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-white leading-tight">Admin Super</p>
+                                <p class="text-[10px] text-slate-400 leading-tight">System Administrator</p>
+                            </div>
+                        </div>
+                        <i data-lucide="log-out" class="w-4 h-4 text-slate-400 hover:text-rose-400"></i>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT WORKSPACE -->
+        <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+
+            <!-- TOP NAVBAR -->
+            <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700/60 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">System Settings</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Configure global threshold parameters, notifications, and security options</p>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleDarkMode()" class="p-2 bg-slate-50 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 transition-all shadow-sm">
+                        <i data-lucide="sun" class="w-4 h-4 dark:hidden"></i>
+                        <i data-lucide="moon" class="w-4 h-4 hidden dark:block"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- PAGE BODY -->
+            <div class="p-6 space-y-6">
+
+                <!-- 3 MAIN SETTINGS CARDS -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                    <!-- 1. General Settings -->
+                    <div class="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 space-y-4">
+                        <div class="border-b border-slate-100 dark:border-slate-700 pb-3 flex items-center gap-2">
+                            <span class="p-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-xl"><i data-lucide="sliders" class="w-5 h-5"></i></span>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900 dark:text-white">1. General Settings</h3>
+                                <p class="text-[11px] text-slate-400">System Name & Sensor Thresholds</p>
+                            </div>
+                        </div>
+
+                        <form onsubmit="handleSaveGeneralSettings(event)" class="space-y-3.5 text-xs">
+                            <div>
+                                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">System / Company Name</label>
+                                <input type="text" id="sysName" value="SafeTrack Logistics & Security Control Center" class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 font-semibold">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Temp Threshold (°C)</label>
+                                    <input type="number" step="0.5" id="tempThresh" value="8.0" class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 font-mono">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Tamper Light (Lux)</label>
+                                    <input type="number" id="lightThresh" value="800" class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 font-mono">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Language</label>
+                                <select id="sysLanguage" class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+                                    <option value="English">English (US)</option>
+                                    <option value="Hindi">Hindi</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-md mt-2">Save General Settings</button>
+                        </form>
+                    </div>
+
+                    <!-- 2. Notifications Settings -->
+                    <div class="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 space-y-4">
+                        <div class="border-b border-slate-100 dark:border-slate-700 pb-3 flex items-center gap-2">
+                            <span class="p-2 bg-amber-50 dark:bg-amber-900/30 text-amber-600 rounded-xl"><i data-lucide="bell" class="w-5 h-5"></i></span>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900 dark:text-white">2. Notifications</h3>
+                                <p class="text-[11px] text-slate-400">Alert Dispatch & Notification Toggles</p>
+                            </div>
+                        </div>
+
+                        <form onsubmit="handleSaveNotifSettings(event)" class="space-y-4 text-xs">
+                            <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/40 border border-slate-100 dark:border-slate-700">
+                                <div>
+                                    <p class="font-bold text-slate-800 dark:text-white">Alert Notifications</p>
+                                    <p class="text-[11px] text-slate-400">Enable in-app alert banners</p>
+                                </div>
+                                <input type="checkbox" id="notifAlerts" checked class="w-4 h-4 accent-blue-600 cursor-pointer">
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/40 border border-slate-100 dark:border-slate-700">
+                                <div>
+                                    <p class="font-bold text-slate-800 dark:text-white">Shipment Updates</p>
+                                    <p class="text-[11px] text-slate-400">Notify on hub arrival/departure</p>
+                                </div>
+                                <input type="checkbox" id="notifShipments" checked class="w-4 h-4 accent-blue-600 cursor-pointer">
+                            </div>
+
+                            <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-700/40 border border-slate-100 dark:border-slate-700">
+                                <div>
+                                    <p class="font-bold text-slate-800 dark:text-white">Email Notifications</p>
+                                    <p class="text-[11px] text-slate-400">Send critical alerts to admin email</p>
+                                </div>
+                                <input type="checkbox" id="notifEmail" checked class="w-4 h-4 accent-blue-600 cursor-pointer">
+                            </div>
+
+                            <button type="submit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-md">Save Notification Settings</button>
+                        </form>
+                    </div>
+
+                    <!-- 3. Security Settings -->
+                    <div class="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 space-y-4">
+                        <div class="border-b border-slate-100 dark:border-slate-700 pb-3 flex items-center gap-2">
+                            <span class="p-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-xl"><i data-lucide="shield" class="w-5 h-5"></i></span>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900 dark:text-white">3. Security</h3>
+                                <p class="text-[11px] text-slate-400">Session Timeout & Credentials</p>
+                            </div>
+                        </div>
+
+                        <form onsubmit="handleSaveSecuritySettings(event)" class="space-y-3 text-xs">
+                            <div>
+                                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Session Timeout (Minutes)</label>
+                                <select id="sessionTimeout" class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+                                    <option value="15">15 Minutes</option>
+                                    <option value="30" selected>30 Minutes</option>
+                                    <option value="60">60 Minutes</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Current Password</label>
+                                <input type="password" id="currentPasswordInput" required placeholder="••••••••" class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+                            </div>
+
+                            <div>
+                                <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">New Password</label>
+                                <input type="password" id="newPasswordInput" required placeholder="Enter new passcode" class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+                            </div>
+
+                            <button type="submit" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-md">Update Password</button>
+
+                            <div class="pt-2">
+                                <button type="button" onclick="showToast('Logged out from all active sessions', 'warning')" class="w-full py-2 bg-rose-50 dark:bg-rose-900/30 hover:bg-rose-100 text-rose-600 dark:text-rose-400 font-bold rounded-xl transition-all border border-rose-200 dark:border-rose-800 flex items-center justify-center gap-2">
+                                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                                    <span>Logout from all devices</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript Files -->
+    <script src="auth.js"></script>
+    <script src="api.js"></script>
+    <script src="settings.js"></script>
+</body>
+</html>

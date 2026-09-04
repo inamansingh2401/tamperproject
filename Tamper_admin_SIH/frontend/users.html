@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeTrack Admin Console - Users & Roles</title>
+
+    <!-- Google Fonts (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        sidebar: {
+                            bg: '#141824',
+                            hover: '#1e2336',
+                            active: '#2563eb',
+                            border: '#1f263b',
+                            text: '#94a3b8',
+                            textActive: '#ffffff'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-[#f8fafc] text-slate-800 font-sans min-h-screen flex antialiased selection:bg-blue-500 selection:text-white dark:bg-slate-900 dark:text-slate-100 transition-colors duration-200">
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- MAIN LAYOUT WRAPPER -->
+    <div class="flex w-full min-h-screen">
+
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="w-64 bg-sidebar-bg text-sidebar-text flex flex-col shrink-0 border-r border-sidebar-border select-none z-40 transition-all duration-300">
+            <div>
+                <!-- Brand Header -->
+                <div class="px-6 py-5 flex items-center gap-3 border-b border-sidebar-border/60">
+                    <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/30 shrink-0">
+                        <i data-lucide="shield-check" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-white text-base leading-tight tracking-tight">SafeTrack</h1>
+                        <p class="text-[11px] text-slate-400 font-medium">Admin Console</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Section -->
+                <div class="px-4 py-4 space-y-6">
+                    <div>
+                        <p class="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Main Menu</p>
+                        <nav class="space-y-1 text-xs font-medium">
+                            <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <i data-lucide="layout-grid" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                <span>Dashboard</span>
+                            </a>
+                            <a href="shipments.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <i data-lucide="package" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                <span>Shipments</span>
+                            </a>
+                            <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <i data-lucide="truck" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                <span>Vehicles</span>
+                            </a>
+                            <a href="alerts.html" class="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="alert-triangle" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                    <span>Alerts & Incidents</span>
+                                </div>
+                                <span class="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">7</span>
+                            </a>
+                            <a href="reports.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <i data-lucide="bar-chart-3" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                <span>Reports</span>
+                            </a>
+                            <a href="users.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-600 text-white shadow-md shadow-blue-600/20 font-semibold transition-all">
+                                <i data-lucide="users" class="w-4 h-4 text-white shrink-0"></i>
+                                <span>Users & Roles</span>
+                            </a>
+                            <a href="settings.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-sidebar-hover text-slate-300 hover:text-white transition-all">
+                                <i data-lucide="settings" class="w-4 h-4 text-slate-400 shrink-0"></i>
+                                <span>Settings</span>
+                            </a>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Footer -->
+            <div class="mt-auto">
+                <div class="p-4 border-t border-sidebar-border/60">
+                    <div class="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-sidebar-hover/60 hover:bg-rose-500/10 cursor-pointer transition-all border border-sidebar-border/40" onclick="SafeTrackAuth.logout()" title="Sign out">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
+                                AS
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-white leading-tight">Admin Super</p>
+                                <p class="text-[10px] text-slate-400 leading-tight">System Administrator</p>
+                            </div>
+                        </div>
+                        <i data-lucide="log-out" class="w-4 h-4 text-slate-400 hover:text-rose-400"></i>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT WORKSPACE -->
+        <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+
+            <!-- TOP NAVBAR -->
+            <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700/60 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Users & Access Control</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Manage administrators and authorized users</p>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button onclick="openModal('addUserModal')" class="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md transition-all">
+                        <i data-lucide="user-plus" class="w-4 h-4"></i>
+                        <span>+ Add User</span>
+                    </button>
+                    <button onclick="toggleDarkMode()" class="p-2 bg-slate-50 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 transition-all shadow-sm">
+                        <i data-lucide="sun" class="w-4 h-4 dark:hidden"></i>
+                        <i data-lucide="moon" class="w-4 h-4 hidden dark:block"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- PAGE BODY -->
+            <div class="p-6 space-y-6">
+
+                <!-- ROLES SUMMARY CARDS (2 Roles) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Role 1</span>
+                            <span class="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600"><i data-lucide="crown" class="w-4 h-4"></i></span>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white">Admin</h3>
+                        <p class="text-xs text-slate-500">Full system control, vehicle management, user access control, and report generation.</p>
+                    </div>
+
+                    <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Role 2</span>
+                            <span class="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600"><i data-lucide="shield" class="w-4 h-4"></i></span>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-white">User</h3>
+                        <p class="text-xs text-slate-500">Monitors assigned shipments, telemetry, temperature history, alerts, and seal status.</p>
+                    </div>
+
+                </div>
+
+                <!-- USERS TABLE -->
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                    <div class="p-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                        <h3 class="text-base font-bold text-slate-900 dark:text-white">All System Users</h3>
+                        <span class="text-xs text-slate-500">Showing <strong id="usersCountText" class="text-slate-900 dark:text-white">5</strong> registered accounts</span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50/70 dark:bg-slate-700/40 text-slate-400 dark:text-slate-400 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-100 dark:border-slate-700">
+                                <tr>
+                                    <th class="px-5 py-3.5">User Name & Email</th>
+                                    <th class="px-5 py-3.5">Role</th>
+                                    <th class="px-5 py-3.5">Assigned Vehicles</th>
+                                    <th class="px-5 py-3.5">Status</th>
+                                    <th class="px-5 py-3.5">Last Login</th>
+                                    <th class="px-5 py-3.5 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/60 font-medium text-slate-700 dark:text-slate-200">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: ADD USER -->
+    <div id="addUserModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <i data-lucide="user-plus" class="w-5 h-5 text-blue-600"></i>
+                    Add New System User
+                </h3>
+                <button onclick="closeModal('addUserModal')" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleAddUserSubmit(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
+                    <input type="text" id="newUserName" required placeholder="e.g. Vikram Singh" class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
+                    <input type="email" id="newUserEmail" required placeholder="e.g. vikram@safetrack.com" class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Role</label>
+                    <select id="newUserRole" class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+                        <option value="user">User (Assigned Shipments)</option>
+                        <option value="User">User (Fleet User)</option>
+                        <option value="admin">Admin (Full Control)</option>
+                    </select>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('addUserModal')" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-medium">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-md">Add User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT USER -->
+    <div id="editUserModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <i data-lucide="user-check" class="w-5 h-5 text-blue-600"></i>
+                    Edit System User
+                </h3>
+                <button onclick="closeModal('editUserModal')" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleSaveEditUser(event)" class="space-y-3 text-xs">
+                <input type="hidden" id="editUserId">
+                <div>
+                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name / Username</label>
+                    <input type="text" id="editUserName" readonly class="w-full bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-500 dark:text-slate-400 cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
+                    <input type="email" id="editUserEmail" required class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Role</label>
+                    <select id="editUserRole" class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+                        <option value="user">User (Assigned Shipments)</option>
+                        <option value="admin">Admin (Full Control)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Status</label>
+                    <select id="editUserStatus" class="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500">
+                        <option value="Active">Active</option>
+                        <option value="Disabled">Disabled</option>
+                    </select>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('editUserModal')" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-medium">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-md">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JavaScript Files -->
+    <script src="auth.js"></script>
+    <script src="api.js"></script>
+    <script src="users.js"></script>
+</body>
+</html>

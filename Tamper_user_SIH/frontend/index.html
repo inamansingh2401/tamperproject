@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SafeTrack | Shipment Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 1. AUTHENTICATION / LOGIN -->
+<section id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="brand-mark"><i data-lucide="shield-check"></i></div>
+      <div>
+        <p class="eyebrow">SAFETRACK PORTAL</p>
+        <span class="muted" style="font-size: 11px;">Consignee & Operations Access</span>
+      </div>
+    </div>
+    
+    <h1 class="login-title">Sign In</h1>
+    <p class="login-copy">Authenticate to view live custody tracking, environmental sensors, and tamper-evident custody status.</p>
+
+    <form id="loginForm" class="form-stack">
+      <label>
+        Username
+        <input id="loginUser" placeholder="e.g. Rahul Sharma" autocomplete="username" required>
+      </label>
+      <label>
+        Access PIN / Password
+        <input id="loginPin" placeholder="••••••••" type="password" autocomplete="current-password" required>
+      </label>
+      <button class="primary-btn" type="submit">
+        <span>Verify & Launch Portal</span>
+        <i data-lucide="arrow-right" style="width:16px; height:16px;"></i>
+      </button>
+    </form>
+
+    <p id="loginError" class="login-error"></p>
+  </div>
+</section>
+
+<!-- TOAST CONTAINER -->
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- 2. APPLICATION SHELL -->
+<div id="appShell" class="app-shell hidden">
+  
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-mark small"><i data-lucide="shield-check"></i></div>
+      <div class="brand-text">
+        <strong>SafeTrack</strong>
+        <span>Shipment Custody Portal</span>
+      </div>
+    </div>
+
+    <!-- TABS / NAVIGATION -->
+    <nav class="nav-tabs" aria-label="Portal Navigation">
+      <button class="tab-btn active" data-tab="overview">
+        <i data-lucide="layout-dashboard"></i>
+        <span>Overview</span>
+      </button>
+      <button class="tab-btn" data-tab="shipment">
+        <i data-lucide="package"></i>
+        <span>Shipment</span>
+      </button>
+      <button class="tab-btn" data-tab="environment">
+        <i data-lucide="activity"></i>
+        <span>Sensors</span>
+      </button>
+      <button class="tab-btn" data-tab="alerts">
+        <i data-lucide="shield-alert"></i>
+        <span>Incidents</span>
+        <span id="alertBadge" class="tab-badge zero">0</span>
+      </button>
+      <button class="tab-btn" data-tab="history">
+        <i data-lucide="file-clock"></i>
+        <span>Audit Trail</span>
+      </button>
+    </nav>
+
+    <!-- RIGHT ACTIONS -->
+    <div class="topbar-actions">
+      <div class="selector-wrap" title="Assigned Waybills">
+        <i data-lucide="box"></i>
+        <select id="shipmentSelector" class="shipment-selector" aria-label="Select assigned shipment"></select>
+      </div>
+      
+      <div class="user-profile">
+        <div id="userInitials" class="user-avatar">RS</div>
+        <div class="user-meta">
+          <span id="headerUserName" class="user-name">Rahul Sharma</span>
+          <span class="user-role">Authorized Consignee</span>
+        </div>
+      </div>
+      
+      <button class="icon-btn" id="logoutBtn" title="Sign Out">
+        <i data-lucide="log-out"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN BODY CONTAINER -->
+  <main class="main-content">
+    
+    <!-- PAGE BREADCRUMB & HEADER -->
+    <div class="portal-header">
+      <div class="header-left">
+        <h2 id="welcomeTitle">Welcome back, Rahul</h2>
+        <p class="muted">Live monitoring for your assigned protected cold-chain consignment.</p>
+      </div>
+      <div class="timestamp-pill">
+        <i data-lucide="clock" style="width:14px; height:14px; color:var(--primary);"></i>
+        <span>Last updated: <strong id="lastUpdated">—</strong></span>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         TAB 1: OVERVIEW (CLEAN, SPACIOUS, HIGH-IMPACT CUSTODY MONITOR)
+         ==================================================================== -->
+    <section id="tab-overview" class="tab-panel active-panel">
+      
+      <!-- HERO PARCEL CARD -->
+      <div class="shipment-hero">
+        <div class="hero-left">
+          <div class="package-badge-icon">
+            <i data-lucide="shield-check" id="heroBadgeIcon"></i>
+          </div>
+          <div class="hero-details">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <p class="eyebrow">ASSIGNED SHIPMENT</p>
+              <span id="overviewShipmentCode" class="font-mono" style="font-size:12px; font-weight:700; color:var(--primary); background:var(--primary-soft); padding:1px 6px; border-radius:4px;">PRCL-2024-05-21-001</span>
+            </div>
+            <h1 id="overviewShipmentTitle">Cold-Chain Medicine & Vaccines</h1>
+            <p id="overviewSubDetails" class="muted">Consignment under active environmental & optical custody monitoring</p>
+          </div>
+        </div>
+        <div class="hero-badges">
+          <div id="overviewSealBadge" class="status good"><i data-lucide="lock" style="width:12px; height:12px;"></i> SEALED</div>
+          <div id="overviewHealth" class="status good">OPTIMAL</div>
+        </div>
+      </div>
+
+      <!-- ROUTE VISUALIZATION (ORIGIN -> HUB -> DESTINATION) -->
+      <article class="panel route-card">
+        <div class="route-header">
+          <div>
+            <p class="eyebrow">TRANSIT PROGRESS</p>
+            <h3>Shipment Route & Checkpoints</h3>
+          </div>
+          <span id="overviewStatusBadge" class="status info">IN TRANSIT</span>
+        </div>
+        
+        <div class="route-track-bar">
+          <div class="route-step done">
+            <div class="step-node"><i data-lucide="check"></i></div>
+            <span class="step-label">Origin</span>
+            <span id="overviewOrigin" class="step-loc">—</span>
+          </div>
+          <div class="route-step active">
+            <div class="step-node"><i data-lucide="truck"></i></div>
+            <span class="step-label">Current Checkpoint</span>
+            <span id="overviewHub" class="step-loc">—</span>
+          </div>
+          <div class="route-step">
+            <div class="step-node"><i data-lucide="map-pin"></i></div>
+            <span class="step-label">Destination</span>
+            <span id="overviewDestination" class="step-loc">—</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 4 SENSOR METRICS (KEY TELEMETRY) -->
+      <div class="telemetry-grid">
+        <div class="panel metric-card">
+          <div class="metric-top">
+            <span class="eyebrow">Temperature</span>
+            <div class="metric-icon temp"><i data-lucide="thermometer"></i></div>
+          </div>
+          <div class="metric-value-wrap">
+            <span id="overviewTemp" class="metric-val">—</span>
+            <span class="metric-unit">°C</span>
+          </div>
+          <div id="overviewTempSub" class="metric-sub">
+            <i data-lucide="check-circle" style="width:13px; color:var(--emerald);"></i>
+            <span>Safe Range (2°C - 8°C)</span>
+          </div>
+        </div>
+
+        <div class="panel metric-card">
+          <div class="metric-top">
+            <span class="eyebrow">Humidity</span>
+            <div class="metric-icon humidity"><i data-lucide="droplets"></i></div>
+          </div>
+          <div class="metric-value-wrap">
+            <span id="overviewHumidity" class="metric-val">—</span>
+            <span class="metric-unit">%</span>
+          </div>
+          <div class="metric-sub">
+            <i data-lucide="check-circle" style="width:13px; color:var(--emerald);"></i>
+            <span>Target Level (40% - 60%)</span>
+          </div>
+        </div>
+
+        <div class="panel metric-card">
+          <div class="metric-top">
+            <span class="eyebrow">Container Light (LDR)</span>
+            <div class="metric-icon light"><i data-lucide="sun"></i></div>
+          </div>
+          <div class="metric-value-wrap">
+            <span id="overviewLight" class="metric-val">—</span>
+            <span class="metric-unit">LUX</span>
+          </div>
+          <div id="overviewLightSub" class="metric-sub">
+            <i data-lucide="shield-check" style="width:13px; color:var(--emerald);"></i>
+            <span>Seal Intact (&lt; 800 LUX)</span>
+          </div>
+        </div>
+
+        <div class="panel metric-card">
+          <div class="metric-top">
+            <span class="eyebrow">Shock / Impact</span>
+            <div class="metric-icon motion"><i data-lucide="move-3d"></i></div>
+          </div>
+          <div class="metric-value-wrap">
+            <span id="overviewMotion" class="metric-val">—</span>
+            <span class="metric-unit">g</span>
+          </div>
+          <div id="overviewMotionSub" class="metric-sub">
+            <i data-lucide="shield" style="width:13px; color:var(--emerald);"></i>
+            <span>Smooth Motion (&lt; 3.0g)</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ====================================================================
+         TAB 2: SHIPMENT DETAILS (INTEGRATED WAYBILL & MANIFEST METADATA)
+         ==================================================================== -->
+    <section id="tab-shipment" class="tab-panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">WAYBILL & DISPATCH MANIFEST</p>
+          <h2>Shipment Specifications & Route</h2>
+          <p class="muted">Complete supply chain custody specifications, vehicle assignment, and route milestones.</p>
+        </div>
+        <span id="shipmentStatus" class="status info">IN TRANSIT</span>
+      </div>
+
+      <article class="panel route-card" style="margin-bottom:20px;">
+        <div class="route-header">
+          <div>
+            <p class="eyebrow">SUPPLY CHAIN JOURNEY</p>
+            <h3>Full Route Progression</h3>
+          </div>
+        </div>
+        <div class="route-track-bar">
+          <div class="route-step done">
+            <div class="step-node"><i data-lucide="check"></i></div>
+            <span class="step-label">Dispatch Hub</span>
+            <span id="shipOrigin" class="step-loc">—</span>
+          </div>
+          <div class="route-step active">
+            <div class="step-node"><i data-lucide="truck"></i></div>
+            <span class="step-label">Current Checkpoint</span>
+            <span id="shipWarehouse" class="step-loc">—</span>
+          </div>
+          <div class="route-step">
+            <div class="step-node"><i data-lucide="map-pin"></i></div>
+            <span class="step-label">Delivery Destination</span>
+            <span id="shipDestination" class="step-loc">—</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- WAYBILL METADATA / MANIFEST ATTRIBUTES INTEGRATED HERE -->
+      <div class="panel" style="padding:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--line);">
+          <div>
+            <p class="eyebrow">CUSTODY PARAMETERS</p>
+            <h3 style="margin:2px 0 0; font-size:16px; font-weight:700;">Manifest Specifications</h3>
+          </div>
+          <span class="font-mono" style="font-size:11px; color:var(--text-muted); background:var(--surface-alt); padding:3px 8px; border-radius:4px; border:1px solid var(--line);">SECURE CARGO PROTOCOL</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:16px;">
+          <div class="spec-item">
+            <span>Waybill Code</span>
+            <strong id="shipCode" class="font-mono">—</strong>
+          </div>
+          <div class="spec-item">
+            <span>Consignment Title</span>
+            <strong id="shipTitle">—</strong>
+          </div>
+          <div class="spec-item">
+            <span>Shipper / Origin</span>
+            <strong id="shipSender">—</strong>
+          </div>
+          <div class="spec-item">
+            <span>Authorized Recipient</span>
+            <strong id="shipRecipient">—</strong>
+          </div>
+          <div class="spec-item">
+            <span>Transport Unit</span>
+            <strong id="shipVehicle" class="font-mono">—</strong>
+          </div>
+          <div class="spec-item">
+            <span>Active Container Seal</span>
+            <strong id="shipSeal">—</strong>
+          </div>
+          <div class="spec-item">
+            <span>Cargo Health State</span>
+            <strong id="shipHealth">—</strong>
+          </div>
+          <div class="spec-item">
+            <span>Dispatch Hub</span>
+            <strong id="shipOriginDetail">—</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3D PACKAGE CONDITION & ORIENTATION MONITOR (MPU6050 SENSOR DRIVEN) -->
+      <article class="panel orientation-section" style="margin-top:20px; padding:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--line);">
+          <div>
+            <p class="eyebrow">PHYSICAL TELEMETRY</p>
+            <h3 style="margin:2px 0 4px; font-size:16px; font-weight:700;">Shipment Condition & 3D Package Orientation</h3>
+            <p class="muted" style="font-size:12px;">Sensor-driven orientation responding directly to node MPU6050 accelerometer and gyroscope data.</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button id="resetPackageViewBtn" class="action-btn-sm" title="Reset Camera View">
+              <i data-lucide="rotate-ccw" style="width:13px; height:13px;"></i>
+              <span>Reset Camera</span>
+            </button>
+            <span class="font-mono" style="font-size:11px; color:var(--text-muted); background:var(--surface-alt); padding:4px 8px; border-radius:4px; border:1px solid var(--line);">MPU6050 6-DOF</span>
+          </div>
+        </div>
+
+        <div class="package-3d-layout">
+          <!-- 3D Canvas Viewport -->
+          <div class="package-viewport-wrapper">
+            <div id="package3dContainer" class="package-canvas-container">
+              <!-- Three.js Canvas renders here -->
+            </div>
+            <div class="package-viewport-overlay">
+              <span class="drag-hint"><i data-lucide="hand" style="width:12px; height:12px;"></i> Click & Drag to Inspect (View only · Does not alter sensor reading)</span>
+            </div>
+          </div>
+
+          <!-- MPU6050 & Orientation Metrics Sidebar -->
+          <div class="package-telemetry-meta">
+            <!-- Dynamic Status Badges -->
+            <div class="meta-status-group">
+              <div class="meta-status-card">
+                <span class="meta-card-label">Orientation Status</span>
+                <div id="orientationBadge" class="status good" style="margin-top:4px;">
+                  <i data-lucide="compass" style="width:12px; height:12px;"></i>
+                  <span id="orientationText">Stable (Upright)</span>
+                </div>
+              </div>
+              <div class="meta-status-card">
+                <span class="meta-card-label">Movement & Shock</span>
+                <div id="motionShockBadge" class="status good" style="margin-top:4px;">
+                  <i data-lucide="activity" style="width:12px; height:12px;"></i>
+                  <span id="motionShockText">Normal (&lt; 2.5g)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pitch / Roll / Tilt Angle Meters -->
+            <div class="angles-grid">
+              <div class="angle-card">
+                <span class="angle-label">Pitch Angle (Tilt X)</span>
+                <strong id="anglePitchVal" class="font-mono angle-value">0.0°</strong>
+              </div>
+              <div class="angle-card">
+                <span class="angle-label">Roll Angle (Tilt Z)</span>
+                <strong id="angleRollVal" class="font-mono angle-value">0.0°</strong>
+              </div>
+            </div>
+
+            <!-- Raw Sensor Readings (Accel & Gyro) -->
+            <div class="raw-sensor-block">
+              <div class="raw-sensor-row">
+                <span>Acceleration Vector (accel_g):</span>
+                <strong id="packageAccelVal" class="font-mono">— g</strong>
+              </div>
+              <div class="raw-sensor-row">
+                <span>Angular Velocity (gyro_dps):</span>
+                <strong id="packageGyroVal" class="font-mono">— °/s</strong>
+              </div>
+              <div class="raw-sensor-row">
+                <span>Last Telemetry Sync:</span>
+                <strong id="packageLastSync" class="font-mono">—</strong>
+              </div>
+            </div>
+
+            <div class="orientation-help-note">
+              <i data-lucide="info" style="width:13px; height:13px; color:var(--text-muted); flex-shrink:0;"></i>
+              <span>Orientation updates in real time when new IoT telemetry packets arrive. Package stabilizes automatically when motion settles.</span>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ====================================================================
+         TAB 3: ENVIRONMENT & TELEMETRY CHARTS
+         ==================================================================== -->
+    <section id="tab-environment" class="tab-panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">ENVIRONMENTAL MONITORING</p>
+          <h2>Real-Time Sensor Telemetry</h2>
+          <p class="muted">Live condition logs received via secure IoT gateway.</p>
+        </div>
+      </div>
+
+      <div class="telemetry-grid">
+        <div class="panel metric-card">
+          <div class="metric-top">
+            <span class="eyebrow">Current Temperature</span>
+            <div class="metric-icon temp"><i data-lucide="thermometer"></i></div>
+          </div>
+          <div class="metric-value-wrap">
+            <span id="envTemp" class="metric-val">—</span>
+            <span class="metric-unit">°C</span>
+          </div>
+          <div id="envTempStatus" class="metric-sub">Within safe range</div>
+        </div>
+
+        <div class="panel metric-card">
+          <div class="metric-top">
+            <span class="eyebrow">Relative Humidity</span>
+            <div class="metric-icon humidity"><i data-lucide="droplets"></i></div>
+          </div>
+          <div class="metric-value-wrap">
+            <span id="envHumidity" class="metric-val">—</span>
+            <span class="metric-unit">%</span>
+          </div>
+          <div class="metric-sub">Continuous ambient monitoring</div>
+        </div>
+
+        <div class="panel metric-card">
+          <div class="metric-top">
+            <span class="eyebrow">Optical Seal (LDR)</span>
+            <div class="metric-icon light"><i data-lucide="sun"></i></div>
+          </div>
+          <div class="metric-value-wrap">
+            <span id="envLight" class="metric-val">—</span>
+            <span class="metric-unit">LUX</span>
+          </div>
+          <div id="envLightStatus" class="metric-sub">Tamper threshold: 800 LUX</div>
+        </div>
+
+        <div class="panel metric-card">
+          <div class="metric-top">
+            <span class="eyebrow">Shock / Acceleration</span>
+            <div class="metric-icon motion"><i data-lucide="move-3d"></i></div>
+          </div>
+          <div class="metric-value-wrap">
+            <span id="envMotion" class="metric-val">—</span>
+            <span class="metric-unit">g</span>
+          </div>
+          <div id="envMotionStatus" class="metric-sub">Impact threshold: 3.0g</div>
+        </div>
+      </div>
+
+      <!-- CHARTS -->
+      <div class="charts-grid">
+        <article class="panel chart-panel">
+          <div class="chart-header">
+            <div>
+              <p class="eyebrow">TELEMETRY TREND</p>
+              <h3>Temperature Profile (°C)</h3>
+            </div>
+            <span class="font-mono" style="font-size:11px; color:var(--text-muted);">2°C - 8°C Goal</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="temperatureChart"></canvas>
+          </div>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="chart-header">
+            <div>
+              <p class="eyebrow">TELEMETRY TREND</p>
+              <h3>Shock & Vibration History (g)</h3>
+            </div>
+            <span class="font-mono" style="font-size:11px; color:var(--text-muted);">3-Axis IMU</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="motionChart"></canvas>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         TAB 4: ALERTS & INCIDENTS (INTEGRITY ADVISORY INTEGRATED HERE)
+         ==================================================================== -->
+    <section id="tab-alerts" class="tab-panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">INTEGRITY ADVISORY & INCIDENTS</p>
+          <h2>Security & Environmental Anomalies</h2>
+          <p class="muted">Active alarms and full resolution history for seal breaches and sensor excursions.</p>
+        </div>
+        <span id="alertSummary" class="status good">NO ACTIVE ALERTS</span>
+      </div>
+
+      <!-- Active Incidents Section -->
+      <div style="margin-bottom:28px;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+          <p class="eyebrow" style="color:var(--text-primary);">ACTIVE INCIDENTS REQUIRING ATTENTION</p>
+          <span id="activeIncidentsCount" class="font-mono" style="font-size:11px; font-weight:700; color:var(--rose); background:var(--rose-soft); padding:1px 6px; border-radius:4px;">0</span>
+        </div>
+        <div id="alertsContainer" class="alerts-stack">
+          <!-- Dynamic Active Alerts will be rendered here -->
+        </div>
+      </div>
+
+      <!-- Historical / Resolved Incidents Section -->
+      <div>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+          <p class="eyebrow">INCIDENT HISTORY & RESOLUTION LOG</p>
+        </div>
+        <div id="resolvedAlertsContainer" class="alerts-stack">
+          <!-- Dynamic Resolved Alerts will be rendered here -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         TAB 5: AUDIT TRAIL / SENSOR LOGS
+         ==================================================================== -->
+    <section id="tab-history" class="tab-panel">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">CRYPTOGRAPHIC AUDIT TRAIL</p>
+          <h2>Sensor Event Ledger</h2>
+          <p class="muted">Tamper-evident hash-linked records stored in immutable sequence.</p>
+        </div>
+      </div>
+
+      <div class="panel data-table-panel">
+        <div class="table-responsive">
+          <table class="clean-table">
+            <thead>
+              <tr>
+                <th>TIMESTAMP</th>
+                <th>TEMPERATURE</th>
+                <th>HUMIDITY</th>
+                <th>LIGHT (LDR)</th>
+                <th>ACCEL / SHOCK</th>
+                <th>RECORD HEALTH</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody"></tbody>
+          </table>
+          <div id="historyEmpty" class="empty-box hidden">
+            <i data-lucide="inbox"></i>
+            <strong>No sensor records found</strong>
+            <p>Waiting for incoming ESP32 node telemetry packets.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer style="margin-top:40px; padding:20px 0; text-align:center; border-top:1px solid var(--line); color:var(--text-muted); font-size:12px;">
+      SafeTrack Unified Cold-Chain & Tamper-Evident Cargo Protection System
+    </footer>
+  </main>
+</div>
+
+<script src="app.js"></script>
+<script>if (window.lucide) lucide.createIcons();</script>
+</body>
+</html>
