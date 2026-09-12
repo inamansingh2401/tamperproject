@@ -1,9 +1,9 @@
 const API_BASE_URL = "https://safetrack-admin-c243.onrender.com/api";
-const USER_DASHBOARD = "https://safetrack-admin-gyfr.vercel.app/";
+const USER_DASHBOARD = "https://safetrack-user-live-chi.vercel.app/";
 
 document.addEventListener("DOMContentLoaded", () => {
-  const token = localStorage.getItem("safetrack_access_token");
-  const role = localStorage.getItem("safetrack_role");
+  const token = sessionStorage.getItem("safetrack_access_token");
+  const role = sessionStorage.getItem("safetrack_role");
   if (token && role === "admin") window.location.replace("index.html");
   if (token && role === "user") window.location.replace(USER_DASHBOARD);
 
@@ -18,7 +18,7 @@ async function handleLogin(event) {
   error.classList.add("hidden");
 
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password })
@@ -27,10 +27,10 @@ async function handleLogin(event) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || "Invalid credentials");
 
-    localStorage.setItem("safetrack_access_token", data.access_token);
-    localStorage.setItem("safetrack_role", data.role);
-    localStorage.setItem("safetrack_username", data.username);
-    localStorage.setItem("safetrack_assigned_shipments", JSON.stringify(data.assigned_shipments || []));
+    sessionStorage.setItem("safetrack_access_token", data.access_token);
+    sessionStorage.setItem("safetrack_role", data.role);
+    sessionStorage.setItem("safetrack_username", data.username);
+    sessionStorage.setItem("safetrack_assigned_shipments", JSON.stringify(data.assigned_shipments || []));
 
     if (data.role === "admin") {
       window.location.replace("index.html");

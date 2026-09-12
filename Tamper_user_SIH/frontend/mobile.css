@@ -1,0 +1,98 @@
+/* Shared phone and tablet behavior. Keep browser zoom available. */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { min-width: 0; }
+button, input, select, textarea { font: inherit; }
+button, a, input, select, textarea { touch-action: manipulation; }
+:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+img, video, canvas { max-width: 100%; }
+[hidden] { display: none !important; }
+.mobile-menu-toggle, .mobile-menu-close, .mobile-backdrop { display: none; }
+.table-responsive, .overflow-x-auto, .wide { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.table-responsive:focus-visible, .overflow-x-auto:focus-visible { outline-offset: -3px; }
+body > a[href="live.html"] { bottom: max(18px, env(safe-area-inset-bottom)); z-index: 35 !important; }
+@media (max-width: 1023px) {
+  .topbar { height: auto; flex-wrap: wrap; padding: 12px 16px; gap: 12px; }
+  .topbar-brand { order: 1; }
+  .topbar-actions { order: 2; margin-left: auto; max-width: 100%; }
+  .nav-tabs { order: 3; width: 100%; max-width: 100%; overflow-x: auto; justify-content: flex-start; }
+  .nav-tabs .tab-btn { flex-shrink: 0; min-height: 44px; }
+  body.has-sidebar #sidebar {
+    position: fixed; inset: 0 auto 0 0; width: min(288px, 85vw);
+    height: 100vh; height: 100dvh; overflow-y: auto; overscroll-behavior-y: contain;
+    z-index: 70; transform: translateX(-100%); visibility: hidden;
+    padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
+  }
+  body.has-sidebar.nav-open #sidebar { transform: translateX(0); visibility: visible; }
+  .mobile-menu-toggle, .mobile-menu-close {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 44px; min-height: 44px; border: 1px solid #64748b;
+    border-radius: 10px; padding: 8px 12px; background: #fff; color: #14213a;
+    font-weight: 600; cursor: pointer; flex-shrink: 0;
+  }
+  .mobile-menu-close { margin: 12px; align-self: flex-end; }
+  .mobile-backdrop:not([hidden]) { display: block; position: fixed; inset: 0; background: #0f172a99; z-index: 60; border: 0; }
+  body.nav-open { overflow: hidden; }
+  body.has-sidebar > .flex { width: 100%; min-width: 0; }
+  body.has-sidebar main { width: 100%; min-width: 0; overflow: visible; }
+  body.has-sidebar main > header { flex-wrap: wrap; gap: 12px; padding: 12px 16px; }
+  body.has-sidebar main > header > div { min-width: 0; flex-wrap: wrap; }
+  body.has-sidebar main > header > div:first-of-type { flex: 1; }
+  body.has-sidebar main > header h2 { font-size: 20px; overflow-wrap: anywhere; }
+  body.has-sidebar main > header > div:last-child { max-width: 100%; }
+  body.has-sidebar main > .p-6 { padding: 16px; }
+  body.has-sidebar main .grid > * { min-width: 0; }
+  #notifMenu { position: fixed; top: 125px; left: 12px; right: 12px; width: auto; max-height: 65dvh; overflow: auto; }
+  [id$="Modal"] { overflow-y: auto; overscroll-behavior: contain; }
+  [id$="Modal"] > div { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; margin: auto; }
+  #inspectShipmentModal > div { padding: 16px; }
+  #sidebar a, #sidebar button { min-height: 44px; }
+  body.has-sidebar main button, body.has-sidebar main select { min-height: 44px; }
+  #toastContainer { max-width: calc(100vw - 24px); right: 12px; }
+  #toastContainer > * { max-width: 100%; min-width: 0; overflow-wrap: anywhere; }
+}
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px !important; min-height: 44px; max-width: 100%; }
+  .login-screen { min-height: 100vh; min-height: 100dvh; padding: 24px 16px; }
+  .login-card { width: 100%; max-width: 440px; padding: 24px; }
+  .portal-main { padding: 20px 16px 88px; min-width: 0; }
+  .main-content { width: calc(100% - 32px); padding-bottom: 88px; min-width: 0; }
+  .topbar { position: relative; }
+  .topbar-actions { width: 100%; min-width: 0; gap: 8px; flex-wrap: wrap; }
+  .selector-wrap { flex: 1; min-width: 0; max-width: 100%; }
+  .shipment-selector { width: 100%; min-width: 0; max-width: 100%; }
+  .user-profile { flex-shrink: 0; }
+  .user-meta { display: none; }
+  .nav-tabs { min-width: 0; max-width: 100%; }
+  .nav-tabs .tab-btn { min-height: 44px; flex-shrink: 0; }
+  .icon-btn { min-width: 44px; min-height: 44px; }
+  .portal-header, .shipment-hero, .panel-header, .alert-item, .spec-list { overflow-wrap: anywhere; }
+  .portal-main .grid, .charts-grid, .overview-split { min-width: 0; }
+  .panel { min-width: 0; }
+  .shipment-hero > *, .panel-header > * { min-width: 0; }
+  .panel-header { flex-wrap: wrap; gap: 10px; }
+  .toast-container { left: 12px; right: 12px; bottom: max(16px, env(safe-area-inset-bottom)); }
+  .toast { min-width: 0; max-width: 100%; width: 100%; }
+  body.live-page main { padding: 20px 16px max(24px, env(safe-area-inset-bottom)); }
+  body.live-page header { flex-wrap: wrap; gap: 8px; }
+  body.live-page header > div { flex: 1 1 240px; }
+  body.live-page header a { display: inline-flex; align-items: center; min-height: 44px; }
+  body.live-page form { padding: 18px; }
+  body.live-page form label, body.live-page form button { flex: 1 1 100%; width: 100%; min-width: 0; }
+  body.live-page .controls { gap: 10px; }
+  body.live-page .controls label { flex: 1 1 100%; min-width: 0; }
+  body.live-page .controls button { flex: 1; min-height: 44px; }
+  body.live-page .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  body.live-page .card { min-width: 0; padding: 16px; overflow-wrap: anywhere; }
+  body.live-page .value { font-size: clamp(22px, 6vw, 28px); }
+  body.live-page #identity, body.live-page #proof, body.live-page .status { overflow-wrap: anywhere; }
+  body.live-page .wide { padding: 12px; }
+  body.has-sidebar .flex.items-center.justify-between { flex-wrap: wrap; gap: 10px; }
+  body.has-sidebar [id$="Modal"] .grid-cols-2 { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 359px) {
+  body.live-page .grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

@@ -1,11 +1,19 @@
 import datetime
 import os
+import secrets
+import hmac
 from typing import Optional
 
 import bcrypt
 import jwt
 
-SECRET_KEY = os.getenv("JWT_SECRET", "dev-only-change-me-2026")
+IS_PRODUCTION = os.getenv("RENDER", "").lower() == "true" or os.getenv("SAFETRACK_ENV") == "production"
+SECRET_KEY = os.getenv("JWT_SECRET", "").strip()
+if IS_PRODUCTION and (len(SECRET_KEY) < 32 or SECRET_KEY == "dev-only-change-me-2026"):
+    raise RuntimeError("Set a unique JWT_SECRET of at least 32 characters before deploying.")
+if not SECRET_KEY:
+    # Local development only: restart invalidates sessions; never use a public default.
+    SECRET_KEY = secrets.token_urlsafe(48)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 720
 
@@ -23,7 +31,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
             import hashlib
             salt, original_hash = hashed_password.split("$", 1)
             test_hash = hashlib.sha256((salt + plain_password).encode("utf-8")).hexdigest()
-            return test_hash == original_hash
+            return hmac.compare_digest(test_hash, original_hash)
     except Exception:
         pass
     return False

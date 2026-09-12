@@ -51,7 +51,7 @@ print("=" * 70)
 
 env_override = os.environ.copy()
 
-env_override["DATABASE_URL"] = "sqlite:///./safetrack.db"
+env_override.setdefault("DATABASE_URL", "sqlite:///./safetrack.db")
 env_override["DEMO_RESET"] = "false"
 
 # Real Hardware is default for live SIH demonstration.

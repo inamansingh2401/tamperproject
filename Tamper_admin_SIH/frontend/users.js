@@ -47,23 +47,23 @@ function renderUsersTable() {
 
         let statusClass = u.status === 'Active' ? 'text-emerald-600 font-semibold' : 'text-slate-400 font-semibold';
 
-        const vehiclesDisplay = u.assigned_vehicles.map(v => `<span class="px-2 py-0.5 text-[10px] font-mono bg-slate-100 dark:bg-slate-700 rounded text-slate-600 dark:text-slate-300">${v}</span>`).join(' ');
+        const vehiclesDisplay = u.assigned_vehicles.map(v => `<span class="px-2 py-0.5 text-[10px] font-mono bg-slate-100 dark:bg-slate-700 rounded text-slate-600 dark:text-slate-300">${escapeHTML(v)}</span>`).join(' ');
 
         tr.innerHTML = `
             <td class="px-5 py-4">
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                        ${u.name.charAt(0)}
+                        ${escapeHTML(u.name.charAt(0))}
                     </div>
                     <div>
-                        <p class="font-bold text-slate-900 dark:text-white">${u.name}</p>
-                        <p class="text-[11px] text-slate-400 font-mono">${u.email}</p>
+                        <p class="font-bold text-slate-900 dark:text-white">${escapeHTML(u.name)}</p>
+                        <p class="text-[11px] text-slate-400 font-mono">${escapeHTML(u.email)}</p>
                     </div>
                 </div>
             </td>
             <td class="px-5 py-4">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${roleBadge}">
-                    ${u.role}
+                    ${escapeHTML(u.role)}
                 </span>
             </td>
             <td class="px-5 py-4">
@@ -72,17 +72,17 @@ function renderUsersTable() {
                 </div>
             </td>
             <td class="px-5 py-4 ${statusClass}">
-                ${u.status}
+                ${escapeHTML(u.status)}
             </td>
             <td class="px-5 py-4 text-slate-500 font-mono text-[11px]">
-                ${u.last_login}
+                ${escapeHTML(u.last_login)}
             </td>
             <td class="px-5 py-4 text-center">
                 <div class="flex items-center justify-center gap-2">
-                    <button onclick="openEditUserModal(${u.id})" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-blue-600 hover:text-white rounded-lg text-slate-700 dark:text-slate-200 transition-colors font-semibold">
+                    <button data-action="openEditUserModal" data-value="${Number(u.id)}" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-blue-600 hover:text-white rounded-lg text-slate-700 dark:text-slate-200 transition-colors font-semibold">
                         Edit
                     </button>
-                    <button onclick="toggleUserStatus(${u.id})" class="px-2.5 py-1 ${u.status === 'Active' ? 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'} rounded-lg transition-colors font-semibold">
+                    <button data-action="toggleUserStatus" data-value="${Number(u.id)}" class="px-2.5 py-1 ${u.status === 'Active' ? 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'} rounded-lg transition-colors font-semibold">
                         ${u.status === 'Active' ? 'Disable' : 'Enable'}
                     </button>
                 </div>
@@ -133,17 +133,26 @@ async function handleAddUserSubmit(e) {
     const userData = {
         name: document.getElementById('newUserName').value,
         email: document.getElementById('newUserEmail').value,
+        password: document.getElementById('newUserPassword').value,
         role: document.getElementById('newUserRole').value,
-        assigned_vehicles: ["TRK-MH-001"]
+        assigned_vehicles: []
     };
 
     try {
+        // Older backends ignore this password and create a shared default login.
+        // Fail safely until the security update has reached Render.
+        const schemaResponse = await fetchWithTimeout('https://safetrack-admin-c243.onrender.com/openapi.json', {cache: 'no-store'});
+        const schema = await schemaResponse.json();
+        if (!schemaResponse.ok || !schema.components?.schemas?.UserCreatePayload?.required?.includes('password')) {
+            throw new Error('The backend security update must be deployed before creating new users.');
+        }
         const created = await SafeTrackAPI.createUser(userData);
+        document.getElementById('newUserPassword').value = '';
         closeModal('addUserModal');
         await loadUsersData();
         showToast(`User ${created.name} created!`, 'success');
     } catch (err) {
-        showToast('Error creating user', 'error');
+        showToast(err.message || 'Error creating user', 'error');
     }
 }
 
@@ -190,7 +199,7 @@ function showToast(message, type = 'info') {
 
     toast.innerHTML = `
         <i data-lucide="${iconName}" class="w-4 h-4 ${type === 'success' ? 'text-emerald-400' : type === 'warning' || type === 'error' ? 'text-rose-400' : 'text-blue-400'}"></i>
-        <span>${message}</span>
+        <span>${escapeHTML(message)}</span>
     `;
 
     container.appendChild(toast);

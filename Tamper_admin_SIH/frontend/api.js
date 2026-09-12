@@ -51,8 +51,9 @@ function connectionStatus(message, failed) {
     if (!bar) {
         bar = document.createElement('div'); bar.id = 'tracksure-connection';
         bar.setAttribute('role','status');
-        bar.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:9999;padding:10px 14px;border-radius:8px;font:13px system-ui;max-width:90vw;box-shadow:0 2px 8px #0002';
-        document.body.appendChild(bar);
+        bar.style.cssText = 'padding:10px 14px;margin:12px 16px 0;border-radius:8px;font:13px system-ui;overflow-wrap:anywhere';
+        const header = document.querySelector('main > header');
+        if (header) header.after(bar); else document.body.appendChild(bar);
     }
     bar.style.background = failed ? '#fff1f2' : '#f0fdf4';
     bar.style.color = failed ? '#9f1239' : '#166534';
@@ -60,14 +61,14 @@ function connectionStatus(message, failed) {
 }
 
 async function authFetch(url, options = {}) {
-    const token = localStorage.getItem('safetrack_access_token');
+    const token = sessionStorage.getItem('safetrack_access_token');
     const headers = new Headers(options.headers || {});
     if (token) headers.set('Authorization', `Bearer ${token}`);
     try {
-        const response = await fetch(url, {...options, headers, cache:'no-store', signal:options.signal || AbortSignal.timeout(65000)});
+        const response = await fetchWithTimeout(url, {...options, headers, cache:'no-store'});
         if (!response.ok) {
             if (response.status === 401) {
-                localStorage.removeItem('safetrack_access_token');
+                sessionStorage.removeItem('safetrack_access_token');
                 if (!location.pathname.endsWith('login.html')) location.replace('login.html');
             }
             let detail = `API returned HTTP ${response.status}`;

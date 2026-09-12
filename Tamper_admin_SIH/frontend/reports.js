@@ -69,7 +69,7 @@ async function handleGenerateReport() {
         const summary = await SafeTrackAPI.getReportsSummary();
         showToast(`Report compiled: ${summary.total_shipments} shipments, ${summary.total_vehicles} vehicles, ${summary.total_alerts} incidents (${summary.compliance_percentage}% compliant)`, "success");
     } catch (e) {
-        showToast("Report compiled using cached fleet telemetry data.", "success");
+        showToast("Report unavailable: the cloud request failed. Try again when connected.", "error");
     }
 }
 
@@ -78,24 +78,31 @@ async function handleExportCSV() {
         const shipments = await SafeTrackAPI.getShipments();
         const vehicles = await SafeTrackAPI.getVehicles();
 
-        let csvContent = "data:text/csv;charset=utf-8,";
+        // Quote embedded quotes and neutralize spreadsheet formulas from stored fields.
+        const csvCell = value => {
+            let text = String(value ?? '');
+            if (/^[\s]*[=+@-]/.test(text) || /^[\t\r\n]/.test(text)) text = "'" + text;
+            return '"' + text.replace(/"/g, '""') + '"';
+        };
+        let csvContent = '\uFEFF';
         csvContent += "Type,ID,Title,Vehicle,Origin,Destination,Status,Temperature,Seal_Status\n";
 
         shipments.forEach(s => {
-            csvContent += `Shipment,"${s.id}","${s.title}","${s.vehicle_id}","${s.origin}","${s.destination}","${s.status}","${s.latest_temperature || ''}","${s.seal_status || ''}"\n`;
+            csvContent += ['Shipment',s.id,s.title,s.vehicle_id,s.origin,s.destination,s.status,s.latest_temperature,s.seal_status].map(csvCell).join(',') + '\r\n';
         });
 
         vehicles.forEach(v => {
-            csvContent += `Vehicle,"${v.id}","${v.name}","","${v.origin}","${v.destination}","${v.status}","",""\n`;
+            csvContent += ['Vehicle',v.id,v.name,'',v.origin,v.destination,v.status,'',''].map(csvCell).join(',') + '\r\n';
         });
 
-        const encodedUri = encodeURI(csvContent);
+        const encodedUri = URL.createObjectURL(new Blob([csvContent], {type:'text/csv;charset=utf-8'}));
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
         link.setAttribute("download", `safetrack_fleet_report_${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(encodedUri), 60000);
 
         showToast("Fleet CSV report downloaded successfully!", "success");
     } catch (err) {
@@ -128,7 +135,7 @@ function showToast(message, type = 'info') {
 
     toast.innerHTML = `
         <i data-lucide="${iconName}" class="w-4 h-4 ${type === 'success' ? 'text-emerald-400' : type === 'warning' || type === 'error' ? 'text-rose-400' : 'text-blue-400'}"></i>
-        <span>${message}</span>
+        <span>${escapeHTML(message)}</span>
     `;
 
     container.appendChild(toast);

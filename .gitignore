@@ -1,1 +1,17 @@
 .idea/
+.codex-tools/
+**/.vercel.old-*/
+**/.vercel/
+**/node_modules/
+**/__pycache__/
+**/.env
+**/.env.*
+!**/.env.example
+**/*.local.json
+**/*.local.txt
+**/*.local.h
+**/*.pem
+**/*.key
+**/*.db
+**/*.db-*
+artifacts/

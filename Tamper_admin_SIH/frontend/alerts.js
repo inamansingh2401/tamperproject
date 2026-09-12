@@ -69,37 +69,37 @@ function renderAlertsFeed() {
                         <i data-lucide="${iconName}" class="w-5 h-5"></i>
                     </div>
                     <div>
-                        <h4 class="font-bold text-sm text-slate-900 dark:text-white">${a.alert_type}</h4>
-                        <p class="text-[11px] text-slate-400">Timestamp: ${a.timestamp} • Location: ${a.location}</p>
+                        <h4 class="font-bold text-sm text-slate-900 dark:text-white">${escapeHTML(a.alert_type)}</h4>
+                        <p class="text-[11px] text-slate-400">Timestamp: ${escapeHTML(a.timestamp)} • Location: ${escapeHTML(a.location)}</p>
                     </div>
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <span class="badge ${badgeClass}">${a.severity}</span>
+                    <span class="badge ${badgeClass}">${escapeHTML(a.severity)}</span>
                     <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full ${a.status === 'Active' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'}">
-                        ${a.status}
+                        ${escapeHTML(a.status)}
                     </span>
                 </div>
             </div>
 
             <!-- MESSAGE & META -->
             <p class="text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-700/40 p-3 rounded-xl border border-slate-100 dark:border-slate-700 font-mono">
-                ${a.message}
+                ${escapeHTML(a.message)}
             </p>
 
             <!-- FOOTER ACTIONS -->
             <div class="flex items-center justify-between text-xs pt-1">
                 <div class="flex items-center gap-3 text-slate-500">
-                    <span>Shipment: <a href="shipments.html?code=${a.shipment_id}" class="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline">${a.shipment_id}</a></span>
-                    <span>Vehicle: <a href="vehicle-details.html?id=${a.vehicle_id}" class="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline">${a.vehicle_id}</a></span>
+                    <span>Shipment: <a href="shipments.html?code=${escapeHTML(a.shipment_id)}" class="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline">${escapeHTML(a.shipment_id)}</a></span>
+                    <span>Vehicle: <a href="vehicle-details.html?id=${escapeHTML(a.vehicle_id)}" class="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline">${escapeHTML(a.vehicle_id)}</a></span>
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <a href="shipments.html?code=${a.shipment_id}" class="px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white font-semibold rounded-xl transition-colors">
+                    <a href="shipments.html?code=${escapeHTML(a.shipment_id)}" class="px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white font-semibold rounded-xl transition-colors">
                         View Shipment
                     </a>
                     ${a.status === 'Active' ? `
-                        <button onclick="resolveSingleAlert('${a.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-sm transition-colors">
+                        <button data-action="resolveSingleAlert" data-value="${escapeHTML(a.id)}" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-sm transition-colors">
                             Mark Resolved
                         </button>
                     ` : `
@@ -166,7 +166,7 @@ function showToast(message, type = 'info') {
 
     toast.innerHTML = `
         <i data-lucide="${iconName}" class="w-4 h-4 ${type === 'success' ? 'text-emerald-400' : type === 'warning' || type === 'error' ? 'text-rose-400' : 'text-blue-400'}"></i>
-        <span>${message}</span>
+        <span>${escapeHTML(message)}</span>
     `;
 
     container.appendChild(toast);

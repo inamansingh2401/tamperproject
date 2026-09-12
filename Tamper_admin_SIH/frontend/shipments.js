@@ -136,7 +136,7 @@ function renderShipmentsTable() {
         tr.className = "hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors";
         tr.innerHTML = `
             <td class="px-5 py-4">
-                <button onclick="inspectShipment('${id}')" class="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline block text-left">
+                <button data-action="inspectShipment" data-value="${id}" class="font-mono font-bold text-blue-600 dark:text-blue-400 hover:underline block text-left">
                     ${id}
                 </button>
                 <p class="text-[11px] text-slate-500 max-w-xs truncate" title="${title}">${title}</p>
@@ -162,13 +162,13 @@ function renderShipmentsTable() {
             <td class="px-5 py-4">${sealBadge}</td>
             <td class="px-5 py-4 text-center">
                 <div class="flex items-center justify-center gap-1.5">
-                    <button onclick="inspectShipment('${id}')" title="Inspect Telemetry & Logs" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 rounded-lg transition-colors">
+                    <button data-action="inspectShipment" data-value="${id}" title="Inspect Telemetry & Logs" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 rounded-lg transition-colors">
                         <i data-lucide="eye" class="w-4 h-4"></i>
                     </button>
-                    <button onclick="openEditShipmentModal('${id}')" title="Edit Shipment" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 rounded-lg transition-colors">
+                    <button data-action="openEditShipmentModal" data-value="${id}" title="Edit Shipment" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 rounded-lg transition-colors">
                         <i data-lucide="edit-3" class="w-4 h-4"></i>
                     </button>
-                    <button onclick="deleteShipmentHandler('${id}')" title="Delete Shipment" class="p-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 rounded-lg transition-colors">
+                    <button data-action="deleteShipmentHandler" data-value="${id}" title="Delete Shipment" class="p-1.5 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 rounded-lg transition-colors">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                     </button>
                 </div>
@@ -241,7 +241,7 @@ async function populateVehicleOptions() {
     if (!select) return;
     try {
         const vehicles = await SafeTrackAPI.getVehicles();
-        select.innerHTML = vehicles.map(v => `<option value="${v.id}">${v.id} (${v.name})</option>`).join("");
+        select.innerHTML = vehicles.map(v => `<option value="${escapeHTML(v.id)}">${escapeHTML(v.id)} (${escapeHTML(v.name)})</option>`).join("");
     } catch (e) {
         console.warn("Could not load vehicles for select", e);
     }
@@ -392,7 +392,7 @@ function renderShipmentInspector(details) {
                             ${esc(health)}
                         </span>
                     </td>
-                    <td class="px-3 py-2.5 font-mono text-[10px] text-slate-400 truncate max-w-[80px]" title="${esc(event.record_hash)}">${hashSnippet ? hashSnippet + "…" : "—"}</td>
+                    <td class="px-3 py-2.5 font-mono text-[10px] text-slate-400 truncate max-w-[80px]" title="${esc(event.record_hash)}">${esc(hashSnippet ? hashSnippet + "…" : "—")}</td>
                     <td class="px-3 py-2.5 text-right text-slate-400 font-mono text-[10px]">#${esc(event.id)}</td>
                 </tr>`;
         }).join("")
@@ -510,11 +510,11 @@ function renderShipmentInspector(details) {
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-slate-500 dark:text-slate-400">Record Hash:</span>
-                            <strong class="font-mono text-[10px] text-blue-600 dark:text-blue-400" title="${latest ? esc(latest.record_hash) : ''}">${latestHash}</strong>
+                            <strong class="font-mono text-[10px] text-blue-600 dark:text-blue-400" title="${latest ? esc(latest.record_hash) : ''}">${escapeHTML(latestHash)}</strong>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-slate-500 dark:text-slate-400">Previous Hash:</span>
-                            <strong class="font-mono text-[10px] text-slate-400" title="${latest ? esc(latest.previous_hash) : ''}">${prevHash}</strong>
+                            <strong class="font-mono text-[10px] text-slate-400" title="${latest ? esc(latest.previous_hash) : ''}">${escapeHTML(prevHash)}</strong>
                         </div>
                     </div>
                 </div>

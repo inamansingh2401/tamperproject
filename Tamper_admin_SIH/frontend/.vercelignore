@@ -1,0 +1,4 @@
+.vercel.old-*/
+node_modules/
+.env*
+*.local.*

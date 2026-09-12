@@ -2,32 +2,52 @@ import hashlib
 import json
 import math
 import os
+import hmac
 from typing import List, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from database import Base, SessionLocal, engine, get_db
 from models import Device, SensorEvent, Shipment, ShipmentAlert, SystemSetting, User, Vehicle
 from auth import create_access_token, decode_access_token, get_password_hash, verify_password
+from auth import IS_PRODUCTION
 
 # Initialize FastAPI App
 app = FastAPI(title="SafeTrack Unified Admin & Operations API", version="3.0.0")
 
-# Enable CORS for Frontend Development
+# These are the two current deployments and explicit local development origins.
+ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", ",".join([
+    "https://safetrack-admin-live-mu.vercel.app",
+    "https://safetrack-user-live-chi.vercel.app",
+    "http://localhost:5500", "http://localhost:5501",
+    "http://127.0.0.1:5500", "http://127.0.0.1:5501", "http://127.0.0.1:5511",
+])).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[origin.strip() for origin in ALLOWED_ORIGINS if origin.strip()],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "X-Device-Key", "Idempotency-Key"],
 )
 
 SEAL_TAMPER_LUX_THRESHOLD = 800.0
 DEMO_RESET = os.getenv("DEMO_RESET", "false").lower() == "true"
-DEVICE_API_KEY = os.getenv("DEVICE_API_KEY", "secret_device_key_esp32_2026")
+DEVICE_API_KEY = os.getenv("DEVICE_API_KEY", "").strip()
+if IS_PRODUCTION and len(DEVICE_API_KEY) < 32:
+    raise RuntimeError("Set a unique DEVICE_API_KEY of at least 32 characters before deploying.")
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Frame-Options"] = "DENY"
+    return response
 
 # Ensure Tables exist
 Base.metadata.create_all(bind=engine)
@@ -91,27 +111,29 @@ def startup_db_seed():
         db.commit()
 
         # Seed Default Users
+        admin_password = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "")
+        demo_password = os.getenv("DEMO_USER_PASSWORD", "")
         demo_users = [
-            ("admin", "admin@safetrack.com", "admin123", "admin", ["All Vehicles"]),
-            ("Rahul Sharma", "rahul.sharma@safetrack.com", "1234", "user", ["PRCL-2024-05-21-001", "PRCL-2024-05-21-007"]),
-            ("Priya Sharma", "priya.sharma@safetrack.com", "1234", "user", ["PRCL-2024-05-21-002", "PRCL-2024-05-21-008"]),
-            ("Arjun Reddy", "arjun.reddy@safetrack.com", "1234", "user", ["PRCL-2024-05-21-003", "PRCL-2024-05-21-009"]),
-            ("Neha Kapoor", "neha.kapoor@safetrack.com", "1234", "user", ["PRCL-2024-05-21-004", "PRCL-2024-05-21-010"]),
+            ("admin", "admin@safetrack.com", admin_password, "admin", ["All Vehicles"]),
+            ("Rahul Sharma", "rahul.sharma@safetrack.com", demo_password, "user", ["PRCL-2024-05-21-001", "PRCL-2024-05-21-007"]),
+            ("Priya Sharma", "priya.sharma@safetrack.com", demo_password, "user", ["PRCL-2024-05-21-002", "PRCL-2024-05-21-008"]),
+            ("Arjun Reddy", "arjun.reddy@safetrack.com", demo_password, "user", ["PRCL-2024-05-21-003", "PRCL-2024-05-21-009"]),
+            ("Neha Kapoor", "neha.kapoor@safetrack.com", demo_password, "user", ["PRCL-2024-05-21-004", "PRCL-2024-05-21-010"]),
         ]
         for username, email, password, role, assignments in demo_users:
             existing = db.query(User).filter(User.username == username).first()
-            if not existing:
+            if not existing and password:
+                if not 12 <= len(password) <= 72 or len(password.encode("utf-8")) > 72:
+                    raise RuntimeError("Bootstrap passwords must contain 12–72 UTF-8 bytes.")
                 db.add(User(username=username, email=email, hashed_password=get_password_hash(password), role=role, assigned_vehicles=json.dumps(assignments)))
-            else:
+            elif existing:
                 if existing.role not in ("admin", "user"):
                     existing.role = "user"
-                if username != "admin":
-                    existing.assigned_vehicles = json.dumps(assignments)
 
         # Seed Default Devices
         for i in range(1, 11):
             device_id = f"ESP32-S3-TRACKER-{i:02d}"
-            if not db.query(Device).filter(Device.device_id == device_id).first():
+            if DEVICE_API_KEY and not db.query(Device).filter(Device.device_id == device_id).first():
                 db.add(Device(device_id=device_id, api_key=DEVICE_API_KEY))
 
         # Seed Default Vehicles
@@ -171,8 +193,8 @@ def startup_db_seed():
 # --- PYDANTIC SCHEMAS ---
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=1, max_length=72)
     shipment_code: Optional[str] = "PRCL-2024-05-21-001"
 
 
@@ -200,22 +222,31 @@ class ShipmentCreatePayload(BaseModel):
 class UserCreatePayload(BaseModel):
     name: str
     email: str
+    password: str = Field(min_length=12, max_length=72)
     role: str = "user"
     assigned_vehicles: Optional[List[str]] = ["PRCL-2024-05-21-001"]
 
+    @field_validator("password")
+    @classmethod
+    def password_byte_limit(cls, value):
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password must not exceed 72 UTF-8 bytes")
+        return value
+
 
 class GPSSensorIngestPayload(BaseModel):
-    event_id: Optional[str] = None
-    device_id: str
-    shipment_code: str
-    temperature: float = 24.0
-    humidity: float = 50.0
-    warehouse_location: str = "Rewari Transit Hub, HR"
+    model_config = ConfigDict(extra="allow", allow_inf_nan=False, str_max_length=512)
+    event_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    device_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")
+    shipment_code: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")
+    temperature: float = Field(ge=-100, le=150)
+    humidity: float = Field(ge=0, le=100)
+    warehouse_location: str = Field(default="Rewari Transit Hub, HR", max_length=128)
     device_key: Optional[str] = None
 
     # Flexible Light Ingest (supports both lux and raw ADC readings)
     light_lux: Optional[float] = None
-    ldr_raw: Optional[float] = None
+    ldr_raw: Optional[float] = Field(default=None, ge=0, le=4095)
 
     # Accelerometer (supports scalar accel_g and 3-axis readings)
     accel_g: Optional[float] = None
@@ -234,10 +265,6 @@ class GPSSensorIngestPayload(BaseModel):
     shock_detected: Optional[bool] = None
     mpu_available: Optional[bool] = None
     mpu_read_ok: Optional[bool] = None
-
-    class Config:
-        extra = "allow"
-
 
 class VehicleUpdatePayload(BaseModel):
     name: Optional[str] = None
@@ -875,7 +902,7 @@ def create_user(payload: UserCreatePayload, db: Session = Depends(get_db), curre
         username=payload.name,
         email=payload.email,
         role=("admin" if payload.role.lower() == "admin" else "user"),
-        hashed_password=get_password_hash("1234"),
+        hashed_password=get_password_hash(payload.password),
         status="Active",
         assigned_vehicles=json.dumps(payload.assigned_vehicles or ["PRCL-2024-05-21-001"])
     )
@@ -977,8 +1004,8 @@ def change_admin_password(payload: ChangePasswordPayload, db: Session = Depends(
     if not verify_password(payload.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect current password")
 
-    if len(payload.new_password) < 4:
-        raise HTTPException(status_code=400, detail="New password must be at least 4 characters")
+    if len(payload.new_password) < 12 or len(payload.new_password.encode("utf-8")) > 72:
+        raise HTTPException(status_code=400, detail="Use at least 12 characters and at most 72 UTF-8 bytes")
 
     current_user.hashed_password = get_password_hash(payload.new_password)
     db.commit()
@@ -1101,15 +1128,18 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
         or getattr(data, "api_key", None)
     )
 
-    valid_device_keys = {device.api_key.strip()}
-
-    if not provided_key or provided_key.strip() not in valid_device_keys:
-        print(f"[AUTH ERROR] Invalid key for device {data.device_id}. Provided: {provided_key!r}, Expected one of: {valid_device_keys}. Headers: {dict(request.headers)}")
+    if not isinstance(provided_key, str) or not hmac.compare_digest(
+        provided_key.strip().encode(), device.api_key.strip().encode()
+    ):
+        # Do not put API keys, JWTs, or request headers into hosted logs.
+        print(f"[AUTH ERROR] Invalid key for device {data.device_id}")
         raise HTTPException(status_code=401, detail="Invalid device key")
 
     if data.event_id:
         previous_event = db.query(SensorEvent).filter(SensorEvent.event_id == data.event_id).first()
         if previous_event:
+            if previous_event.device_id != device.device_id:
+                raise HTTPException(status_code=409, detail="Event identity already in use")
             return {
                 "status": "success",
                 "duplicate": True,

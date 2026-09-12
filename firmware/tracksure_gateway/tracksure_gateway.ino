@@ -1,6 +1,9 @@
 #include <Wire.h>
 #include <DHT.h>
 #include <ArduinoJson.h>
+#include <ArduinoECCX08.h>
+#include <mbedtls/base64.h>
+#include <mbedtls/sha256.h>
 #include <math.h>
 #include <esp_system.h>
 
@@ -33,6 +36,7 @@ const char* WAREHOUSE_LOCATION = "Rewari Transit Hub, HR";
 
 // LDR
 #define LDR_PIN 4
+#define ATECC_KEY_SLOT 0
 
 // =====================================================
 // 4. SENSOR AND TIMING SETTINGS
@@ -73,6 +77,7 @@ const unsigned long MPU_RETRY_INTERVAL_MS = 15000;
 DHT dht(DHTPIN, DHTTYPE);
 
 bool mpuAvailable = false;
+bool ateccAvailable = false;
 
 // Latest valid DHT values
 float temperature = NAN;
@@ -355,8 +360,8 @@ bool sendSensorData(
     doc["boot_id"] = bootId;
     doc["sequence"] = eventSequence;
     doc["uptime_ms"] = millis();
-    doc["firmware_version"] = "tracksure-usb-gateway-1";
-    doc["signature_status"] = "unsigned";
+    doc["firmware_version"] = "tracksure-usb-gateway-2-signed";
+    doc["signature_status"] = "atecc608a-slot-0";
     doc["temperature_age_ms"] = millis()-lastValidDHT;
     doc["device_id"] = DEVICE_ID;
     doc["shipment_code"] = SHIPMENT_CODE;
@@ -384,6 +389,8 @@ bool sendSensorData(
 
     doc["mpu_available"] = mpuAvailable;
     doc["mpu_read_ok"] = mpuReadOk;
+    doc["accel_g"] = mpuReadOk ? round(sqrt(ax * ax + ay * ay + az * az) * 1000.0) / 1000.0 : 1.0;
+    doc["gyro_dps"] = mpuReadOk ? round(sqrt(gx * gx + gy * gy + gz * gz) * 100.0) / 100.0 : 0.0;
 
     if (mpuReadOk)
     {
@@ -413,8 +420,59 @@ bool sendSensorData(
         doc["shock_axis_mode"] = "XY_only";
     }
 
+    if (!ateccAvailable) {
+        Serial.println("[ATECC] Refusing unsigned telemetry: secure element unavailable.");
+        return false;
+    }
+
+    // Sign the exact JSON bytes transported inside record_b64. The laptop
+    // verifies SHA256("TrackSure:event:v1\\0" || record_bytes) with slot 0's
+    // enrolled P-256 public key before it accepts or forwards the record.
+    String signedRecord;
+    serializeJson(doc, signedRecord);
+    const char domain[] = "TrackSure:event:v1";
+    uint8_t digest[32];
+    mbedtls_sha256_context sha;
+    mbedtls_sha256_init(&sha);
+    if (mbedtls_sha256_starts(&sha, 0) != 0 ||
+        mbedtls_sha256_update(&sha, reinterpret_cast<const uint8_t*>(domain), sizeof(domain)) != 0 ||
+        mbedtls_sha256_update(&sha, reinterpret_cast<const uint8_t*>(signedRecord.c_str()), signedRecord.length()) != 0 ||
+        mbedtls_sha256_finish(&sha, digest) != 0) {
+        mbedtls_sha256_free(&sha);
+        Serial.println("[ATECC] SHA-256 failed.");
+        return false;
+    }
+    mbedtls_sha256_free(&sha);
+
+    uint8_t signature[64];
+    if (!ECCX08.ecSign(ATECC_KEY_SLOT, digest, signature)) {
+        Wire.setClock(I2C_CLOCK_HZ);
+        Serial.println("[ATECC] Slot 0 signing failed; telemetry not queued.");
+        return false;
+    }
+    // ArduinoECCX08 raises non-AVR I2C to 1 MHz internally. Restore the
+    // shared bus to a speed supported by the MPU sensor before the next read.
+    Wire.setClock(I2C_CLOCK_HZ);
+
+    size_t recordB64Length = 0, signatureB64Length = 0;
+    char recordB64[1400];
+    char signatureB64[96];
+    if (mbedtls_base64_encode(reinterpret_cast<uint8_t*>(recordB64), sizeof(recordB64) - 1, &recordB64Length,
+        reinterpret_cast<const uint8_t*>(signedRecord.c_str()), signedRecord.length()) != 0 ||
+        mbedtls_base64_encode(reinterpret_cast<uint8_t*>(signatureB64), sizeof(signatureB64) - 1, &signatureB64Length,
+        signature, sizeof(signature)) != 0) {
+        Serial.println("[ATECC] Base64 envelope failed.");
+        return false;
+    }
+    recordB64[recordB64Length] = '\0';
+    signatureB64[signatureB64Length] = '\0';
+    StaticJsonDocument<1600> envelope;
+    envelope["record_b64"] = recordB64;
+    envelope["signature_b64"] = signatureB64;
+    envelope["signature_algorithm"] = "ECDSA_P256_SHA256";
+    envelope["key_slot"] = ATECC_KEY_SLOT;
     String requestBody;
-    serializeJson(doc, requestBody);
+    serializeJson(envelope, requestBody);
 
     OutgoingRecord record{};
     if (requestBody.length() >= sizeof(record.data)) return false;
@@ -456,6 +514,15 @@ void setup()
 
     delay(200);
     scanI2CBus();
+
+    Serial.println("[ATECC] Initializing secure element...");
+    ateccAvailable = ECCX08.begin();
+    Wire.setClock(I2C_CLOCK_HZ);
+    if (ateccAvailable) {
+        Serial.println("[ATECC] Ready; slot 0 signatures required.");
+    } else {
+        Serial.println("[ATECC] Initialization failed; unsigned telemetry is disabled.");
+    }
 
     mpuAvailable = initMPU6050();
 

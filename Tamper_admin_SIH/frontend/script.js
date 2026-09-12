@@ -80,16 +80,16 @@ function renderVehiclesTable() {
 
         // Assigned shipments formatting
         const shipmentPills = v.assigned_shipments.length > 0 ?
-            v.assigned_shipments.map(sId => `<a href="shipments.html?code=${sId}" class="inline-block px-2 py-0.5 text-[11px] font-mono font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-md border border-blue-200 dark:border-blue-800 hover:underline">${sId}</a>`).join(' ') :
+            v.assigned_shipments.map(sId => `<a href="shipments.html?code=${escapeHTML(sId)}" class="inline-block px-2 py-0.5 text-[11px] font-mono font-semibold bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-md border border-blue-200 dark:border-blue-800 hover:underline">${escapeHTML(sId)}</a>`).join(' ') :
             `<span class="text-slate-400 italic">None</span>`;
 
         tr.innerHTML = `
             <td class="px-5 py-4">
-                <a href="vehicle-details.html?id=${v.id}" class="font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1.5">
-                    <span>${v.id}</span>
+                <a href="vehicle-details.html?id=${escapeHTML(v.id)}" class="font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1.5">
+                    <span>${escapeHTML(v.id)}</span>
                     <i data-lucide="external-link" class="w-3 h-3 opacity-60"></i>
                 </a>
-                <p class="text-[11px] text-slate-400 font-normal">${v.name}</p>
+                <p class="text-[11px] text-slate-400 font-normal">${escapeHTML(v.name)}</p>
             </td>
             <td class="px-5 py-4">
                 <div class="flex flex-wrap gap-1">
@@ -97,23 +97,23 @@ function renderVehiclesTable() {
                 </div>
             </td>
             <td class="px-5 py-4 text-slate-700 dark:text-slate-200">
-                <p class="font-medium text-xs">${v.origin}</p>
-                <p class="text-[11px] text-slate-400">→ ${v.destination}</p>
+                <p class="font-medium text-xs">${escapeHTML(v.origin)}</p>
+                <p class="text-[11px] text-slate-400">→ ${escapeHTML(v.destination)}</p>
             </td>
             <td class="px-5 py-4 text-slate-700 dark:text-slate-300 font-medium">
-                ${v.current_hub}
+                ${escapeHTML(v.current_hub)}
             </td>
             <td class="px-5 py-4">
                 <span class="badge ${badgeClass}">
-                    ${v.status}
+                    ${escapeHTML(v.status)}
                 </span>
             </td>
             <td class="px-5 py-4 text-center">
                 <div class="flex items-center justify-center gap-2">
-                    <a href="vehicle-details.html?id=${v.id}" title="View Details" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 transition-colors">
+                    <a href="vehicle-details.html?id=${escapeHTML(v.id)}" title="View Details" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 transition-colors">
                         <i data-lucide="eye" class="w-4 h-4"></i>
                     </a>
-                    <button onclick="openVehicleSettings('${v.id}')" title="Vehicle Settings" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 transition-colors">
+                    <button data-action="openVehicleSettings" data-value="${escapeHTML(v.id)}" title="Vehicle Settings" class="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 transition-colors">
                         <i data-lucide="settings" class="w-4 h-4"></i>
                     </button>
                 </div>
@@ -136,7 +136,7 @@ function filterByVehicleStatus(status) {
 function populateVehicleDropdown() {
     const select = document.getElementById('newShipmentVehicle');
     if (!select || !vehiclesList) return;
-    select.innerHTML = vehiclesList.map(v => `<option value="${v.id}">${v.id} (${v.name})</option>`).join('');
+    select.innerHTML = vehiclesList.map(v => `<option value="${escapeHTML(v.id)}">${escapeHTML(v.id)} (${escapeHTML(v.name)})</option>`).join('');
 }
 
 function openVehicleSettings(vehicleId) {
@@ -247,8 +247,8 @@ function renderRecentAlertsFeed() {
                     <i data-lucide="${iconName}" class="w-4 h-4"></i>
                 </div>
                 <div>
-                    <p class="font-bold text-slate-800 dark:text-white">${a.alert_type}</p>
-                    <p class="text-[11px] text-slate-400 font-mono">${a.shipment_id}</p>
+                    <p class="font-bold text-slate-800 dark:text-white">${escapeHTML(a.alert_type)}</p>
+                    <p class="text-[11px] text-slate-400 font-mono">${escapeHTML(a.shipment_id)}</p>
                 </div>
             </div>
             <div class="flex items-center gap-1.5 shrink-0 text-[11px] text-slate-400">
@@ -445,7 +445,7 @@ function showToast(message, type = 'info') {
 
     toast.innerHTML = `
         <i data-lucide="${iconName}" class="w-4 h-4 ${type === 'success' ? 'text-emerald-400' : type === 'warning' || type === 'error' ? 'text-rose-400' : 'text-blue-400'}"></i>
-        <span>${message}</span>
+        <span>${escapeHTML(message)}</span>
     `;
 
     container.appendChild(toast);

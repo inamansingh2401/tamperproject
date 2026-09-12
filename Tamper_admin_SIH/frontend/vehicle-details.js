@@ -64,7 +64,7 @@ function renderAssignedShipments() {
         container.innerHTML = `
             <div class="col-span-2 text-center py-12 text-slate-400 space-y-3">
                 <i data-lucide="package-open" class="w-12 h-12 mx-auto text-slate-300"></i>
-                <p class="font-medium">No shipments currently assigned to vehicle ${vehicleData.id}.</p>
+                <p class="font-medium">No shipments currently assigned to vehicle ${escapeHTML(vehicleData.id)}.</p>
                 <button onclick="openAssignModal()" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-xl text-xs shadow-md">Assign Cargo Shipment</button>
             </div>
         `;
@@ -87,12 +87,12 @@ function renderAssignedShipments() {
         card.innerHTML = `
             <div class="flex items-start justify-between border-b border-slate-200 dark:border-slate-600/60 pb-3">
                 <div>
-                    <span class="font-mono font-bold text-sm text-blue-600 dark:text-blue-400">${s.id}</span>
-                    <h4 class="font-bold text-xs text-slate-900 dark:text-white mt-0.5">${s.title}</h4>
-                    <p class="text-[11px] text-slate-500">Recipient: ${s.recipient}</p>
+                    <span class="font-mono font-bold text-sm text-blue-600 dark:text-blue-400">${escapeHTML(s.id)}</span>
+                    <h4 class="font-bold text-xs text-slate-900 dark:text-white mt-0.5">${escapeHTML(s.title)}</h4>
+                    <p class="text-[11px] text-slate-500">Recipient: ${escapeHTML(s.recipient)}</p>
                 </div>
                 <div class="flex flex-col items-end gap-1">
-                    <span class="badge ${statusBadge}">${s.status}</span>
+                    <span class="badge ${statusBadge}">${escapeHTML(s.status)}</span>
                     ${sealBadge}
                 </div>
             </div>
@@ -101,34 +101,34 @@ function renderAssignedShipments() {
             <div class="grid grid-cols-4 gap-2 text-center text-xs pt-1">
                 <div class="p-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
                     <span class="text-[10px] text-slate-400 font-bold uppercase block">Temp</span>
-                    <span class="font-bold text-blue-600 dark:text-blue-400">${s.latest_temperature} °C</span>
+                    <span class="font-bold text-blue-600 dark:text-blue-400">${escapeHTML(s.latest_temperature)} °C</span>
                 </div>
                 <div class="p-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
                     <span class="text-[10px] text-slate-400 font-bold uppercase block">Light</span>
-                    <span class="font-semibold text-amber-600">${s.latest_light} Lux</span>
+                    <span class="font-semibold text-amber-600">${escapeHTML(s.latest_light)} Lux</span>
                 </div>
                 <div class="p-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
                     <span class="text-[10px] text-slate-400 font-bold uppercase block">Humidity</span>
-                    <span class="font-semibold text-sky-600">${s.latest_humidity}%</span>
+                    <span class="font-semibold text-sky-600">${escapeHTML(s.latest_humidity)}%</span>
                 </div>
                 <div class="p-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
                     <span class="text-[10px] text-slate-400 font-bold uppercase block">Motion</span>
-                    <span class="font-bold ${s.latest_shock.includes('High') ? 'text-rose-500' : 'text-slate-700 dark:text-slate-300'} truncate block" title="${s.latest_shock}">${s.latest_shock}</span>
+                    <span class="font-bold ${s.latest_shock.includes('High') ? 'text-rose-500' : 'text-slate-700 dark:text-slate-300'} truncate block" title="${escapeHTML(s.latest_shock)}">${escapeHTML(s.latest_shock)}</span>
                 </div>
             </div>
 
             <!-- ROUTE & ACTIONS FOOTER -->
             <div class="flex items-center justify-between text-xs pt-2">
-                <span class="text-[11px] text-slate-500">Current: <strong>${s.current_hub}</strong></span>
+                <span class="text-[11px] text-slate-500">Current: <strong>${escapeHTML(s.current_hub)}</strong></span>
                 <div class="flex items-center gap-2">
-                    <a href="shipments.html?code=${s.id}" class="px-2.5 py-1 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-600 hover:text-white text-blue-600 dark:text-blue-400 font-semibold rounded-lg transition-colors flex items-center gap-1">
+                    <a href="shipments.html?code=${escapeHTML(s.id)}" class="px-2.5 py-1 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-600 hover:text-white text-blue-600 dark:text-blue-400 font-semibold rounded-lg transition-colors flex items-center gap-1">
                         <i data-lucide="eye" class="w-3.5 h-3.5"></i>
                         <span>View</span>
                     </a>
-                    <button onclick="editShipment('${s.id}')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-semibold rounded-lg transition-colors">
+                    <button data-action="editShipment" data-value="${escapeHTML(s.id)}" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-semibold rounded-lg transition-colors">
                         Edit
                     </button>
-                    <button onclick="removeShipment('${s.id}')" class="px-2.5 py-1 bg-rose-50 dark:bg-rose-900/30 hover:bg-rose-600 hover:text-white text-rose-600 dark:text-rose-400 font-semibold rounded-lg transition-colors">
+                    <button data-action="removeShipment" data-value="${escapeHTML(s.id)}" class="px-2.5 py-1 bg-rose-50 dark:bg-rose-900/30 hover:bg-rose-600 hover:text-white text-rose-600 dark:text-rose-400 font-semibold rounded-lg transition-colors">
                         Remove
                     </button>
                 </div>
@@ -153,7 +153,7 @@ async function openAssignModal() {
             return;
         }
 
-        select.innerHTML = available.map(s => `<option value="${s.id}">${s.id} — ${s.title} (${s.vehicle_id ? 'Current: ' + s.vehicle_id : 'Unassigned'})</option>`).join('');
+        select.innerHTML = available.map(s => `<option value="${escapeHTML(s.id)}">${escapeHTML(s.id)} — ${escapeHTML(s.title)} (${escapeHTML(s.vehicle_id ? 'Current: ' + s.vehicle_id : 'Unassigned')})</option>`).join('');
         openModal('assignShipmentModal');
     } catch (e) {
         showToast('Error loading available shipments', 'error');
@@ -253,7 +253,7 @@ function showToast(message, type = 'info') {
 
     toast.innerHTML = `
         <i data-lucide="${iconName}" class="w-4 h-4 ${type === 'success' ? 'text-emerald-400' : type === 'warning' || type === 'error' ? 'text-rose-400' : 'text-blue-400'}"></i>
-        <span>${message}</span>
+        <span>${escapeHTML(message)}</span>
     `;
 
     container.appendChild(toast);

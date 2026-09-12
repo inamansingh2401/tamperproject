@@ -1,18 +1,18 @@
-const SAFETRACK_USER_DASHBOARD = "https://safetrack-admin-gyfr.vercel.app/";
+const SAFETRACK_USER_DASHBOARD = "https://safetrack-user-live-chi.vercel.app/";
 
 function getAuthToken() {
-    return localStorage.getItem("safetrack_access_token");
+    return sessionStorage.getItem("safetrack_access_token");
 }
 
 function getAuthRole() {
-    return localStorage.getItem("safetrack_role");
+    return sessionStorage.getItem("safetrack_role");
 }
 
 function logout() {
-    localStorage.removeItem("safetrack_access_token");
-    localStorage.removeItem("safetrack_role");
-    localStorage.removeItem("safetrack_username");
-    localStorage.removeItem("safetrack_assigned_shipments");
+    sessionStorage.removeItem("safetrack_access_token");
+    sessionStorage.removeItem("safetrack_role");
+    sessionStorage.removeItem("safetrack_username");
+    sessionStorage.removeItem("safetrack_assigned_shipments");
     window.location.replace("login.html");
 }
 

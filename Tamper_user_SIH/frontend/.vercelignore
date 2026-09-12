@@ -1,0 +1,5 @@
+.vercel.old-*/
+node_modules/
+.env*
+*.local.*
+tailwind.input.css

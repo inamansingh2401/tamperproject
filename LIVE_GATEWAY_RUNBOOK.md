@@ -6,9 +6,11 @@ Backend API:
 
 Live dashboards:
 
-`https://safetrack-admin-live-baibhavkumar018-9376.vercel.app/live.html`
+`https://safetrack-admin-live-mu.vercel.app/live.html`
 
-`https://safetrack-user-live-baibhavkumar018-9376.vercel.app/live.html`
+`https://safetrack-user-live-chi.vercel.app/live.html`
+
+These projects are linked to the tracksure1 workspace, authenticated as tracksure057-7791. Use these current links on desktop, Android, or iOS.
 
 ## 1. Flash the ESP32-S3
 

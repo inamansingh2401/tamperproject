@@ -2,6 +2,7 @@
 import json
 import math
 import os
+from pathlib import Path
 import random
 import time
 import urllib.error
@@ -9,7 +10,13 @@ import urllib.request
 import uuid
 
 API_URL = os.getenv("SAFETRACK_API_URL", "https://safetrack-admin-c243.onrender.com/api/events")
-DEVICE_KEY = os.getenv("DEVICE_API_KEY", "secret_device_key_esp32_2026")
+DEVICE_KEY = os.getenv("DEVICE_API_KEY", "").strip()
+if not DEVICE_KEY:
+    private_config = Path(__file__).resolve().parents[2] / "gateway" / "gateway.local.json"
+    if private_config.is_file():
+        DEVICE_KEY = json.loads(private_config.read_text(encoding="utf-8"))["device_key"]
+if not DEVICE_KEY:
+    raise SystemExit("Set DEVICE_API_KEY or configure the ignored gateway/gateway.local.json file.")
 TARGET_TEMP_C = float(os.getenv("SIMULATOR_TEMPERATURE_C", "31.0"))
 SEND_INTERVAL_S = max(2.0, float(os.getenv("SIMULATOR_INTERVAL_SECONDS", "5")))
 SIMULATE_ALL = os.getenv("SIMULATE_ALL_SHIPMENTS", "false").lower() == "true"

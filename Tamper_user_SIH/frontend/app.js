@@ -4,10 +4,11 @@ const ROLE_KEY = "safetrack_role";
 const USER_KEY = "safetrack_username";
 const ASSIGNMENTS_KEY = "safetrack_assigned_shipments";
 
-let authToken = localStorage.getItem(TOKEN_KEY);
+let authToken = sessionStorage.getItem(TOKEN_KEY);
 let currentShipmentCode = null;
 let assignedShipments = [];
 let refreshTimer = null;
+let fetchingReadings = false;
 let temperatureChart = null;
 let motionChart = null;
 
@@ -36,6 +37,8 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 function bindUI() {
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) fetchShipmentData(); });
+  window.addEventListener('online', fetchShipmentData);
   $("loginForm")?.addEventListener("submit", handleLogin);
   $("logoutBtn")?.addEventListener("click", handleLogout);
   $("shipmentSelector")?.addEventListener("change", (e) => selectShipment(e.target.value));
@@ -52,10 +55,10 @@ function bindUI() {
 }
 
 function restoreSession() {
-  const role = localStorage.getItem(ROLE_KEY);
-  const username = localStorage.getItem(USER_KEY);
+  const role = sessionStorage.getItem(ROLE_KEY);
+  const username = sessionStorage.getItem(USER_KEY);
   let saved = [];
-  try { saved = JSON.parse(localStorage.getItem(ASSIGNMENTS_KEY) || "[]"); } catch (_) { saved = []; }
+  try { saved = JSON.parse(sessionStorage.getItem(ASSIGNMENTS_KEY) || "[]"); } catch (_) { saved = []; }
 
   if (!authToken || role !== "user" || !username) return;
 
@@ -74,7 +77,7 @@ async function handleLogin(event) {
   $("loginError").textContent = "";
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password })
@@ -95,10 +98,10 @@ async function handleLogin(event) {
     assignedShipments = Array.isArray(data.assigned_shipments) ? data.assigned_shipments : [];
     currentShipmentCode = assignedShipments[0] || data.shipment_code || null;
 
-    localStorage.setItem(TOKEN_KEY, authToken);
-    localStorage.setItem(ROLE_KEY, data.role);
-    localStorage.setItem(USER_KEY, data.username || username);
-    localStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(assignedShipments));
+    sessionStorage.setItem(TOKEN_KEY, authToken);
+    sessionStorage.setItem(ROLE_KEY, data.role);
+    sessionStorage.setItem(USER_KEY, data.username || username);
+    sessionStorage.setItem(ASSIGNMENTS_KEY, JSON.stringify(assignedShipments));
 
     showApp(data.username || username);
     populateShipmentSelector();
@@ -124,17 +127,17 @@ function handleLogout() {
   refreshTimer = null;
   authToken = null;
   currentShipmentCode = null;
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(ROLE_KEY);
-  localStorage.removeItem(USER_KEY);
-  localStorage.removeItem(ASSIGNMENTS_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(ROLE_KEY);
+  sessionStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(ASSIGNMENTS_KEY);
   window.location.reload();
 }
 
 function startRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(() => {
-    if (authToken && currentShipmentCode) fetchShipmentData();
+    if (!document.hidden && authToken && currentShipmentCode) fetchShipmentData();
   }, 5000);
 }
 
@@ -163,10 +166,12 @@ function selectShipment(code) {
 }
 
 async function fetchShipmentData() {
-  if (!authToken || !currentShipmentCode) return;
+  if (!authToken || !currentShipmentCode || fetchingReadings) return;
+  fetchingReadings = true;
+  const requestedCode = currentShipmentCode;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/shipments/${encodeURIComponent(currentShipmentCode)}`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/api/shipments/${encodeURIComponent(currentShipmentCode)}`, {
       headers: { Authorization: `Bearer ${authToken}` }
     });
 
@@ -177,16 +182,28 @@ async function fetchShipmentData() {
     if (!response.ok) throw new Error(`Shipment request failed: ${response.status}`);
 
     const data = await response.json();
+    if (!authToken || requestedCode !== currentShipmentCode) return;
     renderShipment(data.shipment || {});
     renderEnvironment(data.latest_telemetry || (data.events || [])[0] || null, data.shipment || {});
     renderPackageOrientation(data.latest_telemetry || (data.events || [])[0] || null);
     renderCharts(Array.isArray(data.events) ? data.events : []);
     renderAlerts(Array.isArray(data.alerts) ? data.alerts : []);
     renderHistory(Array.isArray(data.events) ? data.events : []);
-    $("lastUpdated").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const reading = data.latest_telemetry || (data.events || [])[0];
+    const receipt = reading?.created_at ? parseCloudDate(reading.created_at) : null;
+    const recent = receipt && Number.isFinite(receipt.getTime()) && Date.now() - receipt.getTime() < 20000;
+    $("lastUpdated").textContent = receipt ? (recent ? '' : 'Stale · ') + receipt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'No readings yet';
   } catch (error) {
     console.error(error);
+    $("lastUpdated").textContent = 'Offline · readings may be stale';
+  } finally {
+    fetchingReadings = false;
+    if (authToken && requestedCode !== currentShipmentCode) fetchShipmentData();
   }
+}
+
+function parseCloudDate(value) {
+  return new Date(/[zZ]|[+-]\d\d:\d\d$/.test(value) ? value : value + 'Z');
 }
 
 function renderShipment(s) {
@@ -504,12 +521,12 @@ function setStatus(element, value, label) {
 
 function formatTime(value) {
   if (!value) return "—";
-  const d = new Date(value);
+  const d = parseCloudDate(value);
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 function formatDateTime(value) {
   if (!value) return "—";
-  const d = new Date(value);
+  const d = parseCloudDate(value);
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 function number(value, digits = 1) { const n = Number(value); return Number.isFinite(n) ? n.toFixed(digits) : "—"; }
@@ -807,6 +824,7 @@ function renderPackageOrientation(telemetry) {
 
 function animatePackageScene() {
   packageAnimFrame = requestAnimationFrame(animatePackageScene);
+  if (document.hidden || !$('package3dContainer')?.getClientRects().length) return;
 
   // Update OrbitControls if user is inspecting
   if (packageControls) {

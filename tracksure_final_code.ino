@@ -9,8 +9,10 @@
 // 1. WIFI AND SERVER SETTINGS
 // =====================================================
 
-const char* WIFI_SSID = "DESKTOP-T-REX 8142";
-const char* WIFI_PASS = "sudharja";
+// Archived Wi-Fi firmware. Use firmware/tracksure_gateway for the USB gateway.
+// Keep actual Wi-Fi credentials in a local, untracked copy.
+const char* WIFI_SSID = "YOUR_WIFI_SSID";
+const char* WIFI_PASS = "YOUR_WIFI_PASSWORD";
 
 // Example for a FastAPI server running on your laptop/server.
 // Do NOT use localhost or 127.0.0.1 here because, from the
