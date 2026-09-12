@@ -6,23 +6,13 @@ let currentVehicleId = "TRK-MH-001";
 let vehicleData = null;
 let assignedShipments = [];
 
-let vehicleRefreshTimer = null;
-
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     currentVehicleId = urlParams.get('id') || "TRK-MH-001";
 
     await loadVehicleDetails();
-    startVehicleAutoRefresh();
     if (window.lucide) lucide.createIcons();
 });
-
-function startVehicleAutoRefresh() {
-    if (vehicleRefreshTimer) clearInterval(vehicleRefreshTimer);
-    vehicleRefreshTimer = setInterval(async () => {
-        await loadVehicleDetails();
-    }, 1500);
-}
 
 async function loadVehicleDetails() {
     try {
@@ -86,10 +76,10 @@ function renderAssignedShipments() {
         const card = document.createElement('div');
         card.className = 'bg-slate-50 dark:bg-slate-700/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-4 relative group';
 
-        const isSealed = String(s.seal_status || "").toUpperCase() === 'INTACT' || String(s.seal_status || "").toUpperCase() === 'SEALED';
+        const isSealed = s.seal_status === 'Sealed' || s.seal_status === 'Intact';
         let sealBadge = isSealed ? 
-            `<span class="badge badge-optimal"><i data-lucide="lock" class="w-3 h-3"></i> INTACT</span>` : 
-            `<span class="badge badge-critical"><i data-lucide="unlock" class="w-3 h-3"></i> COMPROMISED</span>`;
+            `<span class="badge badge-optimal"><i data-lucide="lock" class="w-3 h-3"></i> Sealed</span>` :
+            `<span class="badge badge-critical"><i data-lucide="unlock" class="w-3 h-3"></i> Breached</span>`;
 
         let statusBadge = s.status === 'In Transit' ? 'badge-in-transit' :
                           s.status === 'Compromised' ? 'badge-critical' : 'badge-at-warehouse';

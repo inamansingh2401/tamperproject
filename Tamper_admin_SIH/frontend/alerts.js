@@ -5,20 +5,10 @@
 let allAlertsList = [];
 let currentFilter = 'all';
 
-let alertsRefreshTimer = null;
-
 document.addEventListener('DOMContentLoaded', async () => {
     await loadAlertsData();
-    startAlertsAutoRefresh();
     if (window.lucide) lucide.createIcons();
 });
-
-function startAlertsAutoRefresh() {
-    if (alertsRefreshTimer) clearInterval(alertsRefreshTimer);
-    alertsRefreshTimer = setInterval(async () => {
-        await loadAlertsData();
-    }, 1500);
-}
 
 async function loadAlertsData() {
     try {

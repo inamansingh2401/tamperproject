@@ -1,4 +1,4 @@
-const SAFETRACK_USER_DASHBOARD = "http://127.0.0.1:5500";
+const SAFETRACK_USER_DASHBOARD = "https://safetrack-admin-gyfr.vercel.app/";
 
 function getAuthToken() {
     return localStorage.getItem("safetrack_access_token");

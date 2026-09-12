@@ -1,4 +1,4 @@
-const API_BASE_URL = `http://${window.location.hostname || '127.0.0.1'}:8000`;
+const API_BASE_URL = "https://safetrack-admin-c243.onrender.com";
 const TOKEN_KEY = "safetrack_access_token";
 const ROLE_KEY = "safetrack_role";
 const USER_KEY = "safetrack_username";
@@ -8,7 +8,6 @@ let authToken = localStorage.getItem(TOKEN_KEY);
 let currentShipmentCode = null;
 let assignedShipments = [];
 let refreshTimer = null;
-let isFetchingShipment = false;
 let temperatureChart = null;
 let motionChart = null;
 
@@ -18,7 +17,6 @@ let packageCamera = null;
 let packageRenderer = null;
 let packageMesh = null;
 let packageControls = null;
-let packageSealPillMat = null;
 let targetPitchDeg = 0;
 let targetRollDeg = 0;
 let targetYawDeg = 0;
@@ -137,7 +135,7 @@ function startRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(() => {
     if (authToken && currentShipmentCode) fetchShipmentData();
-  }, 1500);
+  }, 5000);
 }
 
 function populateShipmentSelector() {
@@ -160,22 +158,12 @@ function populateShipmentSelector() {
 function selectShipment(code) {
   if (!assignedShipments.includes(code)) return;
   currentShipmentCode = code;
-  if (temperatureChart) {
-    temperatureChart.destroy();
-    temperatureChart = null;
-  }
-  if (motionChart) {
-    motionChart.destroy();
-    motionChart = null;
-  }
   fetchShipmentData();
   openTab("overview");
 }
 
 async function fetchShipmentData() {
   if (!authToken || !currentShipmentCode) return;
-  if (isFetchingShipment) return;
-  isFetchingShipment = true;
 
   try {
     const response = await fetch(`${API_BASE_URL}/api/shipments/${encodeURIComponent(currentShipmentCode)}`, {
@@ -189,28 +177,23 @@ async function fetchShipmentData() {
     if (!response.ok) throw new Error(`Shipment request failed: ${response.status}`);
 
     const data = await response.json();
-    const latest = data.latest_telemetry || (data.events || [])[0] || null;
     renderShipment(data.shipment || {});
-    renderEnvironment(latest, data.shipment || {});
-    renderPackageOrientation(latest);
+    renderEnvironment(data.latest_telemetry || (data.events || [])[0] || null, data.shipment || {});
+    renderPackageOrientation(data.latest_telemetry || (data.events || [])[0] || null);
     renderCharts(Array.isArray(data.events) ? data.events : []);
     renderAlerts(Array.isArray(data.alerts) ? data.alerts : []);
     renderHistory(Array.isArray(data.events) ? data.events : []);
-    if ($("lastUpdated")) {
-      $("lastUpdated").textContent = (latest && latest.created_at) ? formatTime(latest.created_at) : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    }
+    $("lastUpdated").textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   } catch (error) {
     console.error(error);
-  } finally {
-    isFetchingShipment = false;
   }
 }
 
 function renderShipment(s) {
   const health = s.health_level || "Optimal";
   const status = s.status || "In Transit";
-  const seal = String(s.seal_status || "INTACT").toUpperCase();
-  const isCompromised = seal === "COMPROMISED" || seal === "BREACHED";
+  const seal = s.seal_status || "Intact";
+  const isBreached = seal.toLowerCase() === "breached";
 
   // Overview Hero
   if ($("overviewShipmentCode")) $("overviewShipmentCode").textContent = s.code || currentShipmentCode || "—";
@@ -221,16 +204,16 @@ function renderShipment(s) {
   
   // Seal Badge & Hero Icon
   if ($("overviewSealBadge")) {
-    $("overviewSealBadge").className = `status ${isCompromised ? 'danger' : 'good'}`;
-    $("overviewSealBadge").innerHTML = `<i data-lucide="${isCompromised ? 'unlock' : 'lock'}" style="width:12px; height:12px;"></i> ${isCompromised ? 'COMPROMISED' : 'INTACT'}`;
+    $("overviewSealBadge").className = `status ${isBreached ? 'danger' : 'good'}`;
+    $("overviewSealBadge").innerHTML = `<i data-lucide="${isBreached ? 'unlock' : 'lock'}" style="width:12px; height:12px;"></i> ${isBreached ? 'BREACHED' : 'SEALED'}`;
   }
   if ($("heroBadgeIcon")) {
-    $("heroBadgeIcon").setAttribute("data-lucide", isCompromised ? "alert-triangle" : "shield-check");
+    $("heroBadgeIcon").setAttribute("data-lucide", isBreached ? "alert-triangle" : "shield-check");
     const parentBox = $("heroBadgeIcon").parentElement;
     if (parentBox) {
-      parentBox.style.color = isCompromised ? "var(--rose)" : "var(--primary)";
-      parentBox.style.background = isCompromised ? "var(--rose-soft)" : "var(--primary-soft)";
-      parentBox.style.borderColor = isCompromised ? "var(--rose-border)" : "var(--primary-border)";
+      parentBox.style.color = isBreached ? "var(--rose)" : "var(--primary)";
+      parentBox.style.background = isBreached ? "var(--rose-soft)" : "var(--primary-soft)";
+      parentBox.style.borderColor = isBreached ? "var(--rose-border)" : "var(--primary-border)";
     }
   }
 
@@ -256,8 +239,8 @@ function renderShipment(s) {
   if ($("shipOriginDetail")) $("shipOriginDetail").textContent = s.origin || "—";
   if ($("shipDestDetail")) $("shipDestDetail").textContent = s.destination || "—";
   if ($("shipSeal")) {
-    $("shipSeal").textContent = isCompromised ? "COMPROMISED" : "INTACT";
-    $("shipSeal").style.color = isCompromised ? "var(--rose)" : "var(--emerald)";
+    $("shipSeal").textContent = isBreached ? "BREACHED" : "SEALED";
+    $("shipSeal").style.color = isBreached ? "var(--rose)" : "var(--emerald)";
   }
   if ($("shipHealth")) {
     $("shipHealth").textContent = health;
@@ -292,10 +275,10 @@ function renderEnvironment(t, shipment) {
   if ($("envMotion")) $("envMotion").textContent = motionVal;
 
   // Sub-status badges & descriptors
-  const isSealCompromised = (String(shipment.seal_status || "").toUpperCase() === "COMPROMISED" || String(shipment.seal_status || "").toUpperCase() === "BREACHED" || (Number.isFinite(light) && light >= 800));
+  const isTempHigh = temp > 15;
+  const isTempWarn = temp > 8;
+  const isSealBreached = light >= 800;
   const isImpact = accel >= 3.0;
-  const isTempHigh = temp > 15.0;
-  const isTempWarn = temp > 8.0;
 
   if ($("envTempStatus")) {
     $("envTempStatus").textContent = isTempHigh ? "Excursion: Temperature High (>15°C)" : isTempWarn ? "Warning: Temperature Elevated (>8°C)" : "Safe Range (2°C - 8°C)";
@@ -305,15 +288,12 @@ function renderEnvironment(t, shipment) {
     $("overviewTempSub").innerHTML = `<i data-lucide="${isTempHigh ? 'alert-octagon' : isTempWarn ? 'alert-triangle' : 'check-circle'}" style="width:13px; color:${isTempHigh ? 'var(--rose)' : isTempWarn ? 'var(--amber)' : 'var(--emerald)'};"></i><span>${isTempHigh ? 'Excursion Detected (>15°C)' : isTempWarn ? 'Elevated (>8°C)' : 'Safe Range (2°C - 8°C)'}</span>`;
   }
 
-  const lightUnit = (t && t.light_unit) ? t.light_unit : "LUX";
-  document.querySelectorAll(".metric-icon.light + .metric-value-wrap .metric-unit").forEach(u => u.textContent = lightUnit);
-
   if ($("envLightStatus")) {
-    $("envLightStatus").textContent = isSealCompromised ? "Compromised: Light Detected (Exposed)" : "Intact: Container Closed (No Light)";
-    $("envLightStatus").style.color = isSealCompromised ? "var(--rose)" : "var(--emerald)";
+    $("envLightStatus").textContent = isSealBreached ? "Breach: Container Opened (≥800 LUX)" : "Container Closed (<800 LUX)";
+    $("envLightStatus").style.color = isSealBreached ? "var(--rose)" : "var(--emerald)";
   }
   if ($("overviewLightSub")) {
-    $("overviewLightSub").innerHTML = `<i data-lucide="${isSealCompromised ? 'unlock' : 'shield-check'}" style="width:13px; color:${isSealCompromised ? 'var(--rose)' : 'var(--emerald)'};"></i><span>${isSealCompromised ? 'Compromised (Light Detected)' : 'Seal Intact (No Light)'}</span>`;
+    $("overviewLightSub").innerHTML = `<i data-lucide="${isSealBreached ? 'unlock' : 'shield-check'}" style="width:13px; color:${isSealBreached ? 'var(--rose)' : 'var(--emerald)'};"></i><span>${isSealBreached ? 'Tamper Detected (≥800 LUX)' : 'Seal Intact (<800 LUX)'}</span>`;
   }
 
   if ($("envMotionStatus")) {
@@ -328,30 +308,15 @@ function renderEnvironment(t, shipment) {
 }
 
 function renderCharts(events) {
-  const tempCanvas = $("temperatureChart");
-  const motionCanvas = $("motionChart");
-  if (!tempCanvas || !motionCanvas || !window.Chart) return;
-
   const ordered = [...events].reverse();
   const labels = ordered.map(e => formatTime(e.created_at));
   const temps = ordered.map(e => Number(e.temperature));
   const motion = ordered.map(e => Number(e.accel_g));
 
-  if (temperatureChart && motionChart) {
-    temperatureChart.data.labels = labels;
-    temperatureChart.data.datasets[0].data = temps;
-    temperatureChart.update("none");
-
-    motionChart.data.labels = labels;
-    motionChart.data.datasets[0].data = motion;
-    motionChart.update("none");
-    return;
-  }
-
   const common = {
     responsive: true,
     maintainAspectRatio: false,
-    animation: false,
+    animation: { duration: 400 },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -368,47 +333,50 @@ function renderCharts(events) {
     }
   };
 
-  if (!temperatureChart) {
-    temperatureChart = new Chart(tempCanvas, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label: 'Temp (°C)',
-          data: temps,
-          borderColor: "#0284c7",
-          backgroundColor: "rgba(2, 132, 199, 0.08)",
-          fill: true,
-          tension: 0.25,
-          borderWidth: 2,
-          pointRadius: 2.5,
-          pointHoverRadius: 5
-        }]
-      },
-      options: common
-    });
-  }
+  if (temperatureChart) temperatureChart.destroy();
+  if (motionChart) motionChart.destroy();
 
-  if (!motionChart) {
-    motionChart = new Chart(motionCanvas, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label: 'Shock (g)',
-          data: motion,
-          borderColor: "#64748b",
-          backgroundColor: "rgba(100, 116, 139, 0.08)",
-          fill: true,
-          tension: 0.2,
-          borderWidth: 2,
-          pointRadius: 2.5,
-          pointHoverRadius: 5
-        }]
-      },
-      options: common
-    });
-  }
+  const tempCanvas = $("temperatureChart");
+  const motionCanvas = $("motionChart");
+  if (!tempCanvas || !motionCanvas || !window.Chart) return;
+
+  temperatureChart = new Chart(tempCanvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: 'Temp (°C)',
+        data: temps,
+        borderColor: "#0284c7",
+        backgroundColor: "rgba(2, 132, 199, 0.08)",
+        fill: true,
+        tension: 0.25,
+        borderWidth: 2,
+        pointRadius: 2.5,
+        pointHoverRadius: 5
+      }]
+    },
+    options: common
+  });
+
+  motionChart = new Chart(motionCanvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: 'Shock (g)',
+        data: motion,
+        borderColor: "#64748b",
+        backgroundColor: "rgba(100, 116, 139, 0.08)",
+        fill: true,
+        tension: 0.2,
+        borderWidth: 2,
+        pointRadius: 2.5,
+        pointHoverRadius: 5
+      }]
+    },
+    options: common
+  });
 }
 
 function renderAlerts(alerts) {
@@ -501,19 +469,12 @@ function renderHistory(events) {
   body.innerHTML = events.map(e => {
     const health = e.health_level || "Optimal";
     const cls = health === "Compromised" ? "danger" : health === "Degraded" ? "warning" : "good";
-    const ax = e.accel_x !== undefined && e.accel_x !== null ? Number(e.accel_x).toFixed(2) : "0.00";
-    const ay = e.accel_y !== undefined && e.accel_y !== null ? Number(e.accel_y).toFixed(2) : "0.00";
-    const az = e.accel_z !== undefined && e.accel_z !== null ? Number(e.accel_z).toFixed(2) : "1.00";
-    const gx = e.gyro_x !== undefined && e.gyro_x !== null ? Number(e.gyro_x).toFixed(1) : "0.0";
-    const gy = e.gyro_y !== undefined && e.gyro_y !== null ? Number(e.gyro_y).toFixed(1) : "0.0";
-    const gz = e.gyro_z !== undefined && e.gyro_z !== null ? Number(e.gyro_z).toFixed(1) : "0.0";
-    const mpuTooltip = `MPU6050 3-Axis Readout:\nAccel: X=${ax}g, Y=${ay}g, Z=${az}g\nGyro: X=${gx}°/s, Y=${gy}°/s, Z=${gz}°/s\nPitch: ${Number(e.pitch || 0).toFixed(1)}°, Roll: ${Number(e.roll || 0).toFixed(1)}°`;
     return `<tr>
       <td>${formatDateTime(e.created_at)}</td>
       <td><b>${number(e.temperature)} °C</b></td>
       <td>${number(e.humidity, 0)} %</td>
       <td>${number(e.light_lux, 0)} LUX</td>
-      <td title="${mpuTooltip}" style="cursor:help;">${number(e.accel_g, 2)} g</td>
+      <td>${number(e.accel_g, 2)} g</td>
       <td><span class="status ${cls}">${esc(health)}</span></td>
     </tr>`;
   }).join("");
@@ -529,13 +490,6 @@ function openTab(tabName) {
     setTimeout(() => {
       init3DPackageScene();
       onPackageResize();
-    }, 50);
-  }
-
-  if (tabName === "environment") {
-    setTimeout(() => {
-      if (temperatureChart) temperatureChart.resize();
-      if (motionChart) motionChart.resize();
     }, 50);
   }
 }
@@ -686,12 +640,12 @@ function buildPackageMesh() {
 
   // Security Seal indicator pill on front face
   const sealPillGeo = new THREE.BoxGeometry(0.5, 0.2, 0.03);
-  packageSealPillMat = new THREE.MeshStandardMaterial({
+  const sealPillMat = new THREE.MeshStandardMaterial({
     color: 0x059669, // Emerald green sealed
     roughness: 0.2,
     metalness: 0.1
   });
-  const sealPill = new THREE.Mesh(sealPillGeo, packageSealPillMat);
+  const sealPill = new THREE.Mesh(sealPillGeo, sealPillMat);
   sealPill.position.set(0, 0.1, boxDepth / 2 + 0.01);
   packageMesh.add(sealPill);
 
@@ -786,14 +740,18 @@ function renderPackageOrientation(telemetry) {
   if ($("packageGyroVal")) $("packageGyroVal").textContent = Number.isFinite(gyro) ? `${gyro.toFixed(1)} °/s` : "— °/s";
   if ($("packageLastSync")) $("packageLastSync").textContent = formatTime(lastMPUEventTime);
 
-  // 1. Calculate realistic Pitch & Roll from sensor telemetry
-  if (telemetry && telemetry.pitch !== undefined && telemetry.pitch !== null && (telemetry.pitch !== 0 || telemetry.roll !== 0 || telemetry.accel_x !== 0)) {
-    targetPitchDeg = Math.max(-60, Math.min(60, Number(telemetry.pitch)));
-    targetRollDeg = Math.max(-60, Math.min(60, Number(telemetry.roll)));
-  } else if (Number.isFinite(accel)) {
+  // 1. Calculate realistic Pitch & Roll from acceleration vector
+  // Normal stationary upright package has ~1.0g gravity vector along Y
+  // If tilted or shocked, the vector deviates
+  if (Number.isFinite(accel)) {
     const deviation = accel - 1.0;
+    
+    // Proportional tilt representation:
+    // When accel deviation is within 0.1g, package is upright (0-2° slight settle)
+    // Deviation scales to tilt degrees (max 45° tilt for visual clarity)
     const rawPitch = Math.max(-45, Math.min(45, deviation * 28));
     const rawRoll = Math.max(-45, Math.min(45, (gyro || 0) * 0.5));
+
     targetPitchDeg = rawPitch;
     targetRollDeg = rawRoll;
   }
@@ -844,11 +802,6 @@ function renderPackageOrientation(telemetry) {
     }
   }
 
-  if (packageSealPillMat) {
-    const isCompromised = (String(telemetry.seal_status || "").toUpperCase() === "COMPROMISED" || Number(telemetry.light_lux) >= 800);
-    packageSealPillMat.color.setHex(isCompromised ? 0xe11d48 : 0x059669);
-  }
-
   if (window.lucide) lucide.createIcons();
 }
 
@@ -863,7 +816,7 @@ function animatePackageScene() {
   // Smoothly interpolate physical orientation to target angles (NO fake continuous rotation)
   // Package remains completely stable when sensor is stable
   if (packageMesh) {
-    const lerpSpeed = 0.20;
+    const lerpSpeed = 0.08;
     currentPitchDeg += (targetPitchDeg - currentPitchDeg) * lerpSpeed;
     currentRollDeg += (targetRollDeg - currentRollDeg) * lerpSpeed;
 

@@ -84,23 +84,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         await inspectShipment(requestedCode);
     }
 
-    startTableAutoRefresh();
-
     if (window.lucide) lucide.createIcons();
 });
-
-let tableRefreshTimer = null;
-function startTableAutoRefresh() {
-    if (tableRefreshTimer) clearInterval(tableRefreshTimer);
-    tableRefreshTimer = setInterval(async () => {
-        const modal = document.getElementById("inspectShipmentModal");
-        const isModalOpen = modal && !modal.classList.contains("hidden");
-        // Update shipments table when modal is closed
-        if (!isModalOpen) {
-            await loadShipmentsData();
-        }
-    }, 1500);
-}
 
 async function loadShipmentsData() {
     try {
@@ -142,10 +127,10 @@ function renderShipmentsTable() {
         const temperature = number(s.latest_temperature, 1);
 
         const statusBadge = statusBadgeClass(s.status);
-        const isSealed = String(s.seal_status || "").toUpperCase() === "INTACT" || String(s.seal_status || "").toUpperCase() === "SEALED";
+        const isSealed = s.seal_status === "Sealed" || s.seal_status === "Intact";
         const sealBadge = isSealed
-            ? `<span class="badge badge-optimal"><i data-lucide="lock" class="w-3 h-3"></i> INTACT</span>`
-            : `<span class="badge badge-critical"><i data-lucide="unlock" class="w-3 h-3"></i> COMPROMISED</span>`;
+            ? `<span class="badge badge-optimal"><i data-lucide="lock" class="w-3 h-3"></i> Sealed</span>`
+            : `<span class="badge badge-critical"><i data-lucide="unlock" class="w-3 h-3"></i> Breached</span>`;
 
         const tr = document.createElement("tr");
         tr.className = "hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors";
@@ -311,21 +296,14 @@ function filterShipmentsData() {
 
 async function inspectShipment(code, silent = false) {
     try {
-        const isSwitchingShipment = (currentlyInspectedCode !== code);
         currentlyInspectedCode = code;
-
-        if (!silent) {
-            // 1. Open the modal FIRST so the DOM container is display: flex with real dimensions
-            openModal("inspectShipmentModal");
-        }
-
         const details = await SafeTrackAPI.getShipmentByCode(code);
         if (!details) return;
 
-        // 2. Render inspector (full build on open/switch, in-place update on silent refresh)
-        renderShipmentInspector(details, !silent || isSwitchingShipment);
+        renderShipmentInspector(details);
 
         if (!silent) {
+            openModal("inspectShipmentModal");
             startInspectionAutoRefresh(code);
         }
 
@@ -336,7 +314,7 @@ async function inspectShipment(code, silent = false) {
     }
 }
 
-function renderShipmentInspector(details, fullRebuild = true) {
+function renderShipmentInspector(details) {
     const titleEl = document.getElementById("inspectModalTitle");
     const bodyEl = document.getElementById("inspectModalBody");
     if (!titleEl || !bodyEl) return;
@@ -345,8 +323,6 @@ function renderShipmentInspector(details, fullRebuild = true) {
     const latest = details.latest_telemetry || null;
     const events = Array.isArray(details.events) ? [...details.events] : [];
     const alerts = Array.isArray(details.alerts) ? details.alerts : [];
-
-    const isSealed = String(s.seal_status || "").toUpperCase() === "INTACT" || String(s.seal_status || "").toUpperCase() === "SEALED";
 
     // Backend returns newest first. Keep that order for an operator/admin view.
     events.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
@@ -367,17 +343,9 @@ function renderShipmentInspector(details, fullRebuild = true) {
     // Calculate orientation values from latest telemetry
     const accelVal = latest ? Number(latest.accel_g) : 1.0;
     const gyroVal = latest ? Number(latest.gyro_dps) : 0.0;
-    let targetPitch = 0;
-    let targetRoll = 0;
-
-    if (latest && latest.pitch !== undefined && latest.pitch !== null && (latest.pitch !== 0 || latest.roll !== 0 || latest.accel_x !== 0)) {
-        targetPitch = Math.max(-60, Math.min(60, Number(latest.pitch)));
-        targetRoll = Math.max(-60, Math.min(60, Number(latest.roll)));
-    } else {
-        const deviation = (Number.isFinite(accelVal) ? accelVal : 1.0) - 1.0;
-        targetPitch = Math.max(-45, Math.min(45, deviation * 28));
-        targetRoll = Math.max(-45, Math.min(45, gyroVal * 0.5));
-    }
+    const deviation = (Number.isFinite(accelVal) ? accelVal : 1.0) - 1.0;
+    const targetPitch = Math.max(-45, Math.min(45, deviation * 28));
+    const targetRoll = Math.max(-45, Math.min(45, gyroVal * 0.5));
     adminTargetPitch = targetPitch;
     adminTargetRoll = targetRoll;
 
@@ -409,13 +377,6 @@ function renderShipmentInspector(details, fullRebuild = true) {
         ? events.map((event) => {
             const health = event.health_level || "Optimal";
             const hashSnippet = String(event.record_hash || "").substring(0, 10);
-            const ax = event.accel_x !== undefined && event.accel_x !== null ? Number(event.accel_x).toFixed(2) : "0.00";
-            const ay = event.accel_y !== undefined && event.accel_y !== null ? Number(event.accel_y).toFixed(2) : "0.00";
-            const az = event.accel_z !== undefined && event.accel_z !== null ? Number(event.accel_z).toFixed(2) : "1.00";
-            const gx = event.gyro_x !== undefined && event.gyro_x !== null ? Number(event.gyro_x).toFixed(1) : "0.0";
-            const gy = event.gyro_y !== undefined && event.gyro_y !== null ? Number(event.gyro_y).toFixed(1) : "0.0";
-            const gz = event.gyro_z !== undefined && event.gyro_z !== null ? Number(event.gyro_z).toFixed(1) : "0.0";
-            const mpuTip = `MPU6050 3-Axis Details:\nAccel: X=${ax}g, Y=${ay}g, Z=${az}g\nGyro: X=${gx}°/s, Y=${gy}°/s, Z=${gz}°/s\nPitch: ${Number(event.pitch || 0).toFixed(1)}°, Roll: ${Number(event.roll || 0).toFixed(1)}°`;
             return `
                 <tr class="border-b border-slate-100 dark:border-slate-700/60 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-700/20">
                     <td class="px-3 py-2.5 whitespace-nowrap text-slate-500 dark:text-slate-400 font-mono text-[10px]">
@@ -424,8 +385,8 @@ function renderShipmentInspector(details, fullRebuild = true) {
                     <td class="px-3 py-2.5 font-bold text-slate-800 dark:text-slate-100">${number(event.temperature, 1)}°C</td>
                     <td class="px-3 py-2.5 text-slate-600 dark:text-slate-300">${number(event.humidity, 1)}%</td>
                     <td class="px-3 py-2.5 text-slate-600 dark:text-slate-300">${number(event.light_lux, 1)}</td>
-                    <td class="px-3 py-2.5 text-slate-600 dark:text-slate-300 cursor-help" title="${mpuTip}">${number(event.accel_g, 2)}g</td>
-                    <td class="px-3 py-2.5 text-slate-600 dark:text-slate-300 font-mono text-[10px] cursor-help" title="${mpuTip}">${number(event.gyro_dps, 1)}°/s</td>
+                    <td class="px-3 py-2.5 text-slate-600 dark:text-slate-300">${number(event.accel_g, 2)}g</td>
+                    <td class="px-3 py-2.5 text-slate-600 dark:text-slate-300 font-mono text-[10px]">${number(event.gyro_dps, 1)}°/s</td>
                     <td class="px-3 py-2.5">
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full border text-[9px] font-bold ${healthClass(health)}">
                             ${esc(health)}
@@ -457,79 +418,15 @@ function renderShipmentInspector(details, fullRebuild = true) {
             </div>`).join("")
         : `<p class="text-xs text-slate-400 text-center py-4">No incidents detected for this shipment.</p>`;
 
-    // If already built and this is just an auto-refresh tick, update values in place WITHOUT wiping 3D canvas
-    const canvasContainer = document.getElementById("adminPackage3dContainer");
-    if (!fullRebuild && canvasContainer && adminPackageRenderer) {
-        if (document.getElementById("adminModalSealBadge")) {
-            document.getElementById("adminModalSealBadge").className = `badge ${isSealed ? 'badge-optimal' : 'badge-critical'} flex items-center gap-1`;
-            const icon = document.getElementById("adminModalSealBadge").querySelector("i");
-            if (icon) icon.setAttribute("data-lucide", isSealed ? "lock" : "unlock");
-            if (document.getElementById("adminModalSealText")) {
-                document.getElementById("adminModalSealText").textContent = isSealed ? "INTACT" : "COMPROMISED";
-            }
-        }
-        if (document.getElementById("adminModalStatusBadge")) {
-            document.getElementById("adminModalStatusBadge").className = `badge ${statusBadgeClass(s.status)}`;
-            document.getElementById("adminModalStatusBadge").textContent = s.status || "Unknown";
-        }
-        if (document.getElementById("adminOrientBadge")) {
-            document.getElementById("adminOrientBadge").className = `inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold mt-1 ${orientBadgeCls}`;
-            document.getElementById("adminOrientLabel").textContent = orientLabel;
-        }
-        if (document.getElementById("adminShockBadge")) {
-            document.getElementById("adminShockBadge").className = `inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold mt-1 ${shockBadgeCls}`;
-            document.getElementById("adminShockLabel").textContent = shockLabel;
-        }
-        if (document.getElementById("adminPitchVal")) document.getElementById("adminPitchVal").textContent = `${targetPitch >= 0 ? '+' : ''}${targetPitch.toFixed(1)}°`;
-        if (document.getElementById("adminRollVal")) document.getElementById("adminRollVal").textContent = `${targetRoll >= 0 ? '+' : ''}${targetRoll.toFixed(1)}°`;
-        if (document.getElementById("adminLatestTemp")) document.getElementById("adminLatestTemp").textContent = latestTemp;
-        if (document.getElementById("adminLatestHum")) document.getElementById("adminLatestHum").textContent = latestHumidity;
-        if (document.getElementById("adminLatestLight")) document.getElementById("adminLatestLight").textContent = latestLight;
-        if (document.getElementById("adminLatestLightUnit")) {
-            document.getElementById("adminLatestLightUnit").textContent = latest && latest.light_unit ? latest.light_unit : "LUX";
-        }
-        if (document.getElementById("adminLatestAccel")) document.getElementById("adminLatestAccel").textContent = latestAccel;
-        if (document.getElementById("adminImuAccel")) document.getElementById("adminImuAccel").textContent = `${latestAccel} g`;
-        if (document.getElementById("adminImuAxes")) {
-            document.getElementById("adminImuAxes").textContent = `${latest ? `${number(latest.accel_x, 2)}, ${number(latest.accel_y, 2)}, ${number(latest.accel_z, 2)}` : '0.00, 0.00, 1.00'} g`;
-        }
-        if (document.getElementById("adminImuGyro")) document.getElementById("adminImuGyro").textContent = `${latestGyro} °/s`;
-        if (document.getElementById("adminImuRecHash")) {
-            document.getElementById("adminImuRecHash").textContent = latestHash;
-            document.getElementById("adminImuRecHash").title = latest ? (latest.record_hash || '') : '';
-        }
-        if (document.getElementById("adminImuPrevHash")) {
-            document.getElementById("adminImuPrevHash").textContent = prevHash;
-            document.getElementById("adminImuPrevHash").title = latest ? (latest.previous_hash || '') : '';
-        }
-        if (document.getElementById("adminTelemetryLogBody")) {
-            document.getElementById("adminTelemetryLogBody").innerHTML = logsRows;
-        }
-        if (document.getElementById("adminAlertsContainer")) {
-            document.getElementById("adminAlertsContainer").innerHTML = alertRows;
-        }
-        if (document.getElementById("adminLastBackendUpdate")) {
-            document.getElementById("adminLastBackendUpdate").textContent = `Last backend update: ${latest ? formatDateTime(latest.created_at) : "No telemetry yet"}`;
-        }
-        return;
-    }
-
-    // FULL REBUILD (Initial Modal Open or Switching Shipment)
     bodyEl.innerHTML = `
         <!-- SHIPMENT SUMMARY -->
         <div class="p-4 bg-slate-50 dark:bg-slate-700/40 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
             <div class="flex items-center justify-between gap-3">
                 <div class="min-w-0">
                     <h4 class="font-bold text-sm text-slate-900 dark:text-white truncate">${esc(s.title)}</h4>
-                    <p id="adminLastBackendUpdate" class="text-[10px] text-slate-400 mt-0.5">Last backend update: ${latest ? esc(formatDateTime(latest.created_at)) : "No telemetry yet"}</p>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Last backend update: ${latest ? esc(formatDateTime(latest.created_at)) : "No telemetry yet"}</p>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
-                    <span id="adminModalSealBadge" class="badge ${isSealed ? 'badge-optimal' : 'badge-critical'} flex items-center gap-1">
-                        <i data-lucide="${isSealed ? 'lock' : 'unlock'}" class="w-3 h-3"></i>
-                        <span id="adminModalSealText">${isSealed ? 'INTACT' : 'COMPROMISED'}</span>
-                    </span>
-                    <span id="adminModalStatusBadge" class="badge ${statusBadgeClass(s.status)}">${esc(s.status || "Unknown")}</span>
-                </div>
+                <span class="badge ${statusBadgeClass(s.status)} shrink-0">${esc(s.status || "Unknown")}</span>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px]">
                 <div><p class="text-slate-400">Sender</p><p class="font-semibold text-slate-700 dark:text-slate-200 mt-0.5">${esc(s.sender)}</p></div>
@@ -575,16 +472,16 @@ function renderShipmentInspector(details, fullRebuild = true) {
                     <div class="grid grid-cols-2 gap-2">
                         <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30">
                             <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Orientation</p>
-                            <span id="adminOrientBadge" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold mt-1 ${orientBadgeCls}">
+                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold mt-1 ${orientBadgeCls}">
                                 <i data-lucide="compass" class="w-3 h-3"></i>
-                                <span id="adminOrientLabel">${orientLabel}</span>
+                                <span>${orientLabel}</span>
                             </span>
                         </div>
                         <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30">
                             <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Motion & Shock</p>
-                            <span id="adminShockBadge" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold mt-1 ${shockBadgeCls}">
+                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold mt-1 ${shockBadgeCls}">
                                 <i data-lucide="activity" class="w-3 h-3"></i>
-                                <span id="adminShockLabel">${shockLabel}</span>
+                                <span>${shockLabel}</span>
                             </span>
                         </div>
                     </div>
@@ -593,11 +490,11 @@ function renderShipmentInspector(details, fullRebuild = true) {
                     <div class="grid grid-cols-2 gap-2">
                         <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                             <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Pitch Angle (Tilt X)</p>
-                            <p id="adminPitchVal" class="text-base font-bold font-mono text-slate-900 dark:text-white mt-0.5">${targetPitch >= 0 ? '+' : ''}${targetPitch.toFixed(1)}°</p>
+                            <p class="text-base font-bold font-mono text-slate-900 dark:text-white mt-0.5">${targetPitch >= 0 ? '+' : ''}${targetPitch.toFixed(1)}°</p>
                         </div>
                         <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                             <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Roll Angle (Tilt Z)</p>
-                            <p id="adminRollVal" class="text-base font-bold font-mono text-slate-900 dark:text-white mt-0.5">${targetRoll >= 0 ? '+' : ''}${targetRoll.toFixed(1)}°</p>
+                            <p class="text-base font-bold font-mono text-slate-900 dark:text-white mt-0.5">${targetRoll >= 0 ? '+' : ''}${targetRoll.toFixed(1)}°</p>
                         </div>
                     </div>
 
@@ -605,23 +502,19 @@ function renderShipmentInspector(details, fullRebuild = true) {
                     <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30 space-y-1.5 text-[11px]">
                         <div class="flex items-center justify-between">
                             <span class="text-slate-500 dark:text-slate-400">Accel Vector (accel_g):</span>
-                            <strong id="adminImuAccel" class="font-mono text-slate-800 dark:text-slate-200">${latestAccel} g</strong>
-                        </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-slate-500 dark:text-slate-400">3-Axis Accel (X, Y, Z):</span>
-                            <strong id="adminImuAxes" class="font-mono text-slate-800 dark:text-slate-200">${latest ? `${number(latest.accel_x, 2)}, ${number(latest.accel_y, 2)}, ${number(latest.accel_z, 2)}` : '0.00, 0.00, 1.00'} g</strong>
+                            <strong class="font-mono text-slate-800 dark:text-slate-200">${latestAccel} g</strong>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-slate-500 dark:text-slate-400">Gyro Velocity (gyro_dps):</span>
-                            <strong id="adminImuGyro" class="font-mono text-slate-800 dark:text-slate-200">${latestGyro} °/s</strong>
+                            <strong class="font-mono text-slate-800 dark:text-slate-200">${latestGyro} °/s</strong>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-slate-500 dark:text-slate-400">Record Hash:</span>
-                            <strong id="adminImuRecHash" class="font-mono text-[10px] text-blue-600 dark:text-blue-400" title="${latest ? esc(latest.record_hash) : ''}">${latestHash}</strong>
+                            <strong class="font-mono text-[10px] text-blue-600 dark:text-blue-400" title="${latest ? esc(latest.record_hash) : ''}">${latestHash}</strong>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-slate-500 dark:text-slate-400">Previous Hash:</span>
-                            <strong id="adminImuPrevHash" class="font-mono text-[10px] text-slate-400" title="${latest ? esc(latest.previous_hash) : ''}">${prevHash}</strong>
+                            <strong class="font-mono text-[10px] text-slate-400" title="${latest ? esc(latest.previous_hash) : ''}">${prevHash}</strong>
                         </div>
                     </div>
                 </div>
@@ -632,19 +525,19 @@ function renderShipmentInspector(details, fullRebuild = true) {
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
             <div class="p-3 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20">
                 <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Temperature</p>
-                <p class="text-base font-bold text-slate-900 dark:text-white mt-1"><span id="adminLatestTemp">${latestTemp}</span> <span class="text-xs font-medium">°C</span></p>
+                <p class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestTemp} <span class="text-xs font-medium">°C</span></p>
             </div>
             <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Humidity</p>
-                <p class="text-base font-bold text-slate-900 dark:text-white mt-1"><span id="adminLatestHum">${latestHumidity}</span> <span class="text-xs font-medium">%</span></p>
+                <p class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestHumidity} <span class="text-xs font-medium">%</span></p>
             </div>
             <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Light</p>
-                <p class="text-base font-bold text-slate-900 dark:text-white mt-1"><span id="adminLatestLight">${latestLight}</span> <span id="adminLatestLightUnit" class="text-xs font-medium">${latest && latest.light_unit ? latest.light_unit : "LUX"}</span></p>
+                <p class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestLight} <span class="text-xs font-medium">LUX</span></p>
             </div>
             <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Acceleration</p>
-                <p class="text-base font-bold text-slate-900 dark:text-white mt-1"><span id="adminLatestAccel">${latestAccel}</span> <span class="text-xs font-medium">g</span></p>
+                <p class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestAccel} <span class="text-xs font-medium">g</span></p>
             </div>
         </div>
 
@@ -675,7 +568,7 @@ function renderShipmentInspector(details, fullRebuild = true) {
                             <th class="px-3 py-2.5 text-right">ID</th>
                         </tr>
                     </thead>
-                    <tbody id="adminTelemetryLogBody" class="divide-y divide-slate-100 dark:divide-slate-700/60">
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700/60">
                         ${logsRows}
                     </tbody>
                 </table>
@@ -691,7 +584,7 @@ function renderShipmentInspector(details, fullRebuild = true) {
                 </div>
                 <span class="text-[10px] font-bold text-slate-400">${alerts.length} ALERT${alerts.length === 1 ? "" : "S"}</span>
             </div>
-            <div id="adminAlertsContainer" class="space-y-2">${alertRows}</div>
+            <div class="space-y-2">${alertRows}</div>
         </div>
     `;
 
@@ -700,7 +593,7 @@ function renderShipmentInspector(details, fullRebuild = true) {
     // Mount or refresh the 3D scene for this exact shipment
     setTimeout(() => {
         initAdmin3DPackageScene();
-    }, 50);
+    }, 40);
 }
 
 function startInspectionAutoRefresh(code) {
@@ -712,7 +605,7 @@ function startInspectionAutoRefresh(code) {
             return;
         }
         await inspectShipment(code, true);
-    }, 1500);
+    }, 3000);
 }
 
 function stopInspectionAutoRefresh() {
@@ -790,15 +683,8 @@ function initAdmin3DPackageScene() {
         destroyAdminPackageScene();
     }
 
-    // Ensure non-zero real dimensions with robust parent fallback
-    let width = container.clientWidth || container.getBoundingClientRect().width;
-    let height = container.clientHeight || container.getBoundingClientRect().height;
-    if (!width || width < 50) {
-        width = container.parentElement ? (container.parentElement.clientWidth || 450) : 450;
-    }
-    if (!height || height < 50) {
-        height = 280;
-    }
+    const width = container.clientWidth || 400;
+    const height = container.clientHeight || 280;
 
     // Create Scene
     adminPackageScene = new THREE.Scene();
@@ -817,17 +703,13 @@ function initAdmin3DPackageScene() {
 
     // OrbitControls
     if (window.THREE.OrbitControls) {
-        try {
-            adminPackageControls = new THREE.OrbitControls(adminPackageCamera, adminPackageRenderer.domElement);
-            adminPackageControls.enableDamping = true;
-            adminPackageControls.dampingFactor = 0.08;
-            adminPackageControls.enableZoom = true;
-            adminPackageControls.minDistance = 2.0;
-            adminPackageControls.maxDistance = 7.0;
-            adminPackageControls.maxPolarAngle = Math.PI / 2 + 0.1;
-        } catch (e) {
-            console.warn("OrbitControls init note:", e);
-        }
+        adminPackageControls = new THREE.OrbitControls(adminPackageCamera, adminPackageRenderer.domElement);
+        adminPackageControls.enableDamping = true;
+        adminPackageControls.dampingFactor = 0.08;
+        adminPackageControls.enableZoom = true;
+        adminPackageControls.minDistance = 2.0;
+        adminPackageControls.maxDistance = 7.0;
+        adminPackageControls.maxPolarAngle = Math.PI / 2 + 0.1;
     }
 
     // Lighting
@@ -862,9 +744,6 @@ function initAdmin3DPackageScene() {
 
     // Build Cargo Model
     buildAdminPackageMesh();
-
-    // Render initial frame immediately so parcel appears without delay
-    adminPackageRenderer.render(adminPackageScene, adminPackageCamera);
 
     // Start Animation Loop
     animateAdminPackageScene();
@@ -977,7 +856,7 @@ function animateAdminPackageScene() {
 
     // Physical orientation driven by real sensor telemetry (smooth lerp, no artificial endless rotation)
     if (adminPackageMesh) {
-        const lerpSpeed = 0.20;
+        const lerpSpeed = 0.08;
         adminCurrentPitch += (adminTargetPitch - adminCurrentPitch) * lerpSpeed;
         adminCurrentRoll += (adminTargetRoll - adminCurrentRoll) * lerpSpeed;
 

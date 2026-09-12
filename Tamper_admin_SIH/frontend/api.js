@@ -1,13 +1,11 @@
 /**
  * SafeTrack Admin Console - Data API Layer
- * 
- * Connected directly to Python FastAPI Backend on http://127.0.0.1:8000/api
- * Shares the SQLite Database (safetrack.db) with the Operator Console!
+ * Connected directly to Python FastAPI Backend on https://safetrack-admin-c243.onrender.com
  */
 
 const API_CONFIG = {
-    BASE_URL: `http://${window.location.hostname || '127.0.0.1'}:8000/api`,
-    USE_MOCK_DATA: false // Set to false to use live FastAPI backend
+    BASE_URL: 'https://safetrack-admin-c243.onrender.com/api',
+    USE_MOCK_DATA: false // Live FastAPI mode active
 };
 
 // ==========================================
@@ -48,26 +46,41 @@ let mockUsers = [
 // AUTHENTICATED FASTAPI LIVE BACKEND CONNECTIVITY
 // ==========================================
 
-async function authFetch(url, options = {}) {
-    const token = localStorage.getItem("safetrack_access_token");
-    const headers = new Headers(options.headers || {});
-    if (token) headers.set("Authorization", `Bearer ${token}`);
-
-    const response = await fetch(url, { ...options, headers });
-
-    if (response.status === 401 || response.status === 403) {
-        localStorage.removeItem("safetrack_access_token");
-        localStorage.removeItem("safetrack_role");
-        localStorage.removeItem("safetrack_username");
-        localStorage.removeItem("safetrack_assigned_shipments");
-        if (!location.pathname.endsWith("login.html")) {
-            location.replace("login.html");
-        }
+function connectionStatus(message, failed) {
+    let bar = document.getElementById('tracksure-connection');
+    if (!bar) {
+        bar = document.createElement('div'); bar.id = 'tracksure-connection';
+        bar.setAttribute('role','status');
+        bar.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:9999;padding:10px 14px;border-radius:8px;font:13px system-ui;max-width:90vw;box-shadow:0 2px 8px #0002';
+        document.body.appendChild(bar);
     }
-
-    return response;
+    bar.style.background = failed ? '#fff1f2' : '#f0fdf4';
+    bar.style.color = failed ? '#9f1239' : '#166534';
+    bar.textContent = message;
 }
 
+async function authFetch(url, options = {}) {
+    const token = localStorage.getItem('safetrack_access_token');
+    const headers = new Headers(options.headers || {});
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    try {
+        const response = await fetch(url, {...options, headers, cache:'no-store', signal:options.signal || AbortSignal.timeout(65000)});
+        if (!response.ok) {
+            if (response.status === 401) {
+                localStorage.removeItem('safetrack_access_token');
+                if (!location.pathname.endsWith('login.html')) location.replace('login.html');
+            }
+            let detail = `API returned HTTP ${response.status}`;
+            try { const body = await response.clone().json(); if (typeof body.detail === 'string') detail = body.detail; } catch (_) {}
+            throw new Error(detail);
+        }
+        connectionStatus('Cloud connected · Open Live sensors for reading freshness', false);
+        return response;
+    } catch (error) {
+        connectionStatus('Cloud unavailable: displayed values may be stale. ' + error.message, true);
+        throw error;
+    }
+}
 
 const SafeTrackAPI = {
     async getVehicles() {
@@ -76,6 +89,7 @@ const SafeTrackAPI = {
                 const res = await authFetch(`${API_CONFIG.BASE_URL}/vehicles`);
                 if (res.ok) return await res.json();
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, loading mock vehicles", e);
             }
         }
@@ -88,6 +102,7 @@ const SafeTrackAPI = {
                 const res = await authFetch(`${API_CONFIG.BASE_URL}/vehicles/${vehicleId}`);
                 if (res.ok) return await res.json();
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, loading mock vehicle", e);
             }
         }
@@ -104,6 +119,7 @@ const SafeTrackAPI = {
                 });
                 if (res.ok) return await res.json();
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, saving locally", e);
             }
         }
@@ -132,11 +148,9 @@ const SafeTrackAPI = {
                     body: JSON.stringify(updateData)
                 });
                 if (res.ok) return await res.json();
-                const err = await res.json();
-                throw new Error(err.detail || "Failed to update vehicle");
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend error updating vehicle", e);
-                if (e.message && !e.message.includes("Failed to fetch")) throw e;
             }
         }
         const index = mockVehicles.findIndex(v => v.id === vehicleId);
@@ -150,15 +164,11 @@ const SafeTrackAPI = {
     async deleteVehicle(vehicleId) {
         if (!API_CONFIG.USE_MOCK_DATA) {
             try {
-                const res = await authFetch(`${API_CONFIG.BASE_URL}/vehicles/${vehicleId}`, {
-                    method: 'DELETE'
-                });
+                const res = await authFetch(`${API_CONFIG.BASE_URL}/vehicles/${vehicleId}`, { method: 'DELETE' });
                 if (res.ok) return await res.json();
-                const err = await res.json();
-                throw new Error(err.detail || "Failed to delete vehicle");
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend error deleting vehicle", e);
-                if (e.message && !e.message.includes("Failed to fetch")) throw e;
             }
         }
         mockVehicles = mockVehicles.filter(v => v.id !== vehicleId);
@@ -174,11 +184,9 @@ const SafeTrackAPI = {
                     body: JSON.stringify({ shipment_code: shipmentCode })
                 });
                 if (res.ok) return await res.json();
-                const err = await res.json();
-                throw new Error(err.detail || "Failed to assign shipment");
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend error assigning shipment", e);
-                if (e.message && !e.message.includes("Failed to fetch")) throw e;
             }
         }
         const v = mockVehicles.find(item => item.id === vehicleId);
@@ -194,6 +202,7 @@ const SafeTrackAPI = {
                 const res = await authFetch(`${API_CONFIG.BASE_URL}/shipments`);
                 if (res.ok) return await res.json();
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, loading mock shipments", e);
             }
         }
@@ -206,6 +215,7 @@ const SafeTrackAPI = {
                 const res = await authFetch(`${API_CONFIG.BASE_URL}/shipments/${code}`);
                 if (res.ok) return await res.json();
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, loading mock shipment code", e);
             }
         }
@@ -224,6 +234,12 @@ const SafeTrackAPI = {
         };
     },
 
+    async getLiveTelemetry(shipmentId) {
+        if (!shipmentId) throw new Error('Choose a shipment');
+        const result = await this.getShipmentByCode(shipmentId);
+        return result.latest_telemetry;
+    },
+
     async createShipment(shipmentData) {
         if (!API_CONFIG.USE_MOCK_DATA) {
             try {
@@ -233,11 +249,9 @@ const SafeTrackAPI = {
                     body: JSON.stringify(shipmentData)
                 });
                 if (res.ok) return await res.json();
-                const err = await res.json();
-                throw new Error(err.detail || "Failed to create shipment");
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, saving shipment locally", e);
-                if (e.message && !e.message.includes("Failed to fetch")) throw e;
             }
         }
         const newShipment = {
@@ -271,11 +285,9 @@ const SafeTrackAPI = {
                     body: JSON.stringify(updateData)
                 });
                 if (res.ok) return await res.json();
-                const err = await res.json();
-                throw new Error(err.detail || "Failed to update shipment");
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend error updating shipment", e);
-                if (e.message && !e.message.includes("Failed to fetch")) throw e;
             }
         }
         const index = mockShipments.findIndex(s => s.id === shipmentId);
@@ -289,21 +301,14 @@ const SafeTrackAPI = {
     async deleteShipment(shipmentId) {
         if (!API_CONFIG.USE_MOCK_DATA) {
             try {
-                const res = await authFetch(`${API_CONFIG.BASE_URL}/shipments/${shipmentId}`, {
-                    method: 'DELETE'
-                });
+                const res = await authFetch(`${API_CONFIG.BASE_URL}/shipments/${shipmentId}`, { method: 'DELETE' });
                 if (res.ok) return await res.json();
-                const err = await res.json();
-                throw new Error(err.detail || "Failed to delete shipment");
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend error deleting shipment", e);
-                if (e.message && !e.message.includes("Failed to fetch")) throw e;
             }
         }
         mockShipments = mockShipments.filter(s => s.id !== shipmentId);
-        mockVehicles.forEach(v => {
-            v.assigned_shipments = v.assigned_shipments.filter(id => id !== shipmentId);
-        });
         return { success: true };
     },
 
@@ -316,11 +321,9 @@ const SafeTrackAPI = {
                     body: JSON.stringify({ shipment_code: shipmentId })
                 });
                 if (res.ok) return await res.json();
-                const err = await res.json();
-                throw new Error(err.detail || "Failed to remove shipment");
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend error removing shipment", e);
-                if (e.message && !e.message.includes("Failed to fetch")) throw e;
             }
         }
         const vehicle = mockVehicles.find(v => v.id === vehicleId);
@@ -336,6 +339,7 @@ const SafeTrackAPI = {
                 const res = await authFetch(`${API_CONFIG.BASE_URL}/alerts`);
                 if (res.ok) return await res.json();
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, loading mock alerts", e);
             }
         }
@@ -348,6 +352,7 @@ const SafeTrackAPI = {
                 const res = await authFetch(`${API_CONFIG.BASE_URL}/alerts/${alertId}/resolve`, { method: 'PUT' });
                 if (res.ok) return await res.json();
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, resolving locally", e);
             }
         }
@@ -365,6 +370,7 @@ const SafeTrackAPI = {
                 const res = await authFetch(`${API_CONFIG.BASE_URL}/alerts/resolve-all`, { method: 'PUT' });
                 if (res.ok) return await res.json();
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, resolving all alerts locally", e);
             }
         }
@@ -381,6 +387,7 @@ const SafeTrackAPI = {
                 const res = await authFetch(`${API_CONFIG.BASE_URL}/users`);
                 if (res.ok) return await res.json();
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, loading mock users", e);
             }
         }
@@ -396,11 +403,9 @@ const SafeTrackAPI = {
                     body: JSON.stringify(userData)
                 });
                 if (res.ok) return await res.json();
-                const err = await res.json();
-                throw new Error(err.detail || "Failed to create user");
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, creating user locally", e);
-                if (e.message && !e.message.includes("Failed to fetch")) throw e;
             }
         }
         const newUser = {
@@ -425,11 +430,9 @@ const SafeTrackAPI = {
                     body: JSON.stringify(userData)
                 });
                 if (res.ok) return await res.json();
-                const err = await res.json();
-                throw new Error(err.detail || "Failed to update user");
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend error updating user", e);
-                if (e.message && !e.message.includes("Failed to fetch")) throw e;
             }
         }
         const user = mockUsers.find(u => u.id === userId);
@@ -446,6 +449,7 @@ const SafeTrackAPI = {
                 const res = await authFetch(`${API_CONFIG.BASE_URL}/users/${userId}/toggle-status`, { method: 'PUT' });
                 if (res.ok) return await res.json();
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, toggling status locally", e);
             }
         }
@@ -463,6 +467,7 @@ const SafeTrackAPI = {
                 const res = await authFetch(`${API_CONFIG.BASE_URL}/settings`);
                 if (res.ok) return await res.json();
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, using default settings", e);
             }
         }
@@ -487,11 +492,9 @@ const SafeTrackAPI = {
                     body: JSON.stringify(data)
                 });
                 if (res.ok) return await res.json();
-                const err = await res.json();
-                throw new Error(err.detail || "Failed to update settings");
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend error saving settings", e);
-                if (e.message && !e.message.includes("Failed to fetch")) throw e;
             }
         }
         return { success: true };
@@ -517,6 +520,7 @@ const SafeTrackAPI = {
                 const res = await authFetch(`${API_CONFIG.BASE_URL}/reports/summary`);
                 if (res.ok) return await res.json();
             } catch (e) {
+                if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, getting summary locally", e);
             }
         }

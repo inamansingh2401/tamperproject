@@ -7,21 +7,11 @@ let shipmentsList = [];
 let alertsList = [];
 let filteredVehiclesList = [];
 
-let dashboardRefreshTimer = null;
-
 document.addEventListener('DOMContentLoaded', async () => {
     await loadDashboardData();
     initCharts();
-    startDashboardAutoRefresh();
     if (window.lucide) lucide.createIcons();
 });
-
-function startDashboardAutoRefresh() {
-    if (dashboardRefreshTimer) clearInterval(dashboardRefreshTimer);
-    dashboardRefreshTimer = setInterval(async () => {
-        await loadDashboardData();
-    }, 1500);
-}
 
 async function loadDashboardData() {
     try {
