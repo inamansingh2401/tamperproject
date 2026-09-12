@@ -73,6 +73,7 @@ class Shipment(Base):
 class SensorEvent(Base):
     __tablename__ = "sensor_events"
     id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(String(128), unique=True, index=True, nullable=True)
     shipment_id = Column(Integer, ForeignKey("shipments.id"), nullable=False)
     device_id = Column(String(64), nullable=False)
     light_lux = Column(Float, default=0.0)

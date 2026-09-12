@@ -177,6 +177,12 @@ def serial_loop(outbox, config, port):
             continue
         try:
             with serial.Serial(selected, 115200, timeout=1, write_timeout=2) as connection:
+                # ESP32-S3 native USB uses these control lines for reset/boot.
+                # PySerial asserts both by default on some Windows drivers, which
+                # can leave the board in reset or ROM download mode.
+                connection.setDTR(False)
+                connection.setRTS(False)
+                time.sleep(0.25)
                 LOG.info('ESP32 connected on %s', selected)
                 while not STOP.is_set():
                     line = connection.read_until(b'\n', 16385).strip()

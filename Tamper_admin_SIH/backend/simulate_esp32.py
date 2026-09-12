@@ -1,121 +1,97 @@
+"""SafeTrack telemetry simulator with smooth room-condition sensor behavior."""
 import json
 import math
+import os
 import random
 import time
+import urllib.error
 import urllib.request
+import uuid
 
-API_URL = "http://127.0.0.1:8000/api/events"
-DEVICE_KEY = "secret_device_key_esp32_2026"
+API_URL = os.getenv("SAFETRACK_API_URL", "https://safetrack-admin-c243.onrender.com/api/events")
+DEVICE_KEY = os.getenv("DEVICE_API_KEY", "secret_device_key_esp32_2026")
+TARGET_TEMP_C = float(os.getenv("SIMULATOR_TEMPERATURE_C", "31.0"))
+SEND_INTERVAL_S = max(2.0, float(os.getenv("SIMULATOR_INTERVAL_SECONDS", "5")))
+SIMULATE_ALL = os.getenv("SIMULATE_ALL_SHIPMENTS", "false").lower() == "true"
+DEMO_TAMPER = os.getenv("SIMULATOR_DEMO_TAMPER", "false").lower() == "true"
 
-# Realistic Cold-Chain Profiles
 SHIPMENT_CONFIGS = [
-    {"code": "PRCL-2024-05-21-001", "device": "ESP32-S3-TRACKER-01", "base_temp": 4.1, "base_hum": 49.0, "location": "Rewari Transit Hub, HR", "demo_tamper": False},
-    {"code": "PRCL-2024-05-21-007", "device": "ESP32-S3-TRACKER-02", "base_temp": 4.5, "base_hum": 52.0, "location": "Rewari Transit Hub, HR", "demo_tamper": False},
-    {"code": "PRCL-2024-05-21-002", "device": "ESP32-S3-TRACKER-03", "base_temp": 5.0, "base_hum": 53.0, "location": "Visakhapatnam Port Hub, AP", "demo_tamper": False},
-    {"code": "PRCL-2024-05-21-003", "device": "ESP32-S3-TRACKER-04", "base_temp": 3.8, "base_hum": 47.0, "location": "Vijayawada Transit Yard, AP", "demo_tamper": False},
-    # PRCL-004 features periodic dynamic tamper cycles (0 LUX Intact <-> 1000 LUX Compromised) for live demonstration
-    {"code": "PRCL-2024-05-21-004", "device": "ESP32-S3-TRACKER-05", "base_temp": 4.8, "base_hum": 55.0, "location": "Panvel Checkpoint, MH", "demo_tamper": True},
-    {"code": "PRCL-2024-05-21-005", "device": "ESP32-S3-TRACKER-06", "base_temp": 4.2, "base_hum": 48.0, "location": "Jaipur Highway Hub, RJ", "demo_tamper": False},
-    {"code": "PRCL-2024-05-21-006", "device": "ESP32-S3-TRACKER-07", "base_temp": 4.4, "base_hum": 50.0, "location": "Agra Transit Hub, UP", "demo_tamper": False},
-    {"code": "PRCL-2024-05-21-008", "device": "ESP32-S3-TRACKER-08", "base_temp": 4.6, "base_hum": 51.0, "location": "Visakhapatnam Port Hub, AP", "demo_tamper": False},
-    {"code": "PRCL-2024-05-21-009", "device": "ESP32-S3-TRACKER-09", "base_temp": 3.9, "base_hum": 46.0, "location": "Vijayawada Transit Yard, AP", "demo_tamper": False},
-    {"code": "PRCL-2024-05-21-010", "device": "ESP32-S3-TRACKER-10", "base_temp": 4.3, "base_hum": 49.0, "location": "Agra Transit Hub, UP", "demo_tamper": False},
+    {"code": "PRCL-2024-05-21-001", "device": "ESP32-S3-TRACKER-01", "temp_offset": 0.0, "humidity": 56.0, "location": "Rewari Transit Hub, HR"},
+    {"code": "PRCL-2024-05-21-007", "device": "ESP32-S3-TRACKER-02", "temp_offset": -0.3, "humidity": 58.0, "location": "Rewari Transit Hub, HR"},
+    {"code": "PRCL-2024-05-21-002", "device": "ESP32-S3-TRACKER-03", "temp_offset": 0.4, "humidity": 62.0, "location": "Visakhapatnam Port Hub, AP"},
+    {"code": "PRCL-2024-05-21-003", "device": "ESP32-S3-TRACKER-04", "temp_offset": 0.1, "humidity": 59.0, "location": "Vijayawada Transit Yard, AP"},
+    {"code": "PRCL-2024-05-21-004", "device": "ESP32-S3-TRACKER-05", "temp_offset": 0.6, "humidity": 61.0, "location": "Panvel Checkpoint, MH"},
+    {"code": "PRCL-2024-05-21-005", "device": "ESP32-S3-TRACKER-06", "temp_offset": -0.2, "humidity": 53.0, "location": "Jaipur Highway Hub, RJ"},
+    {"code": "PRCL-2024-05-21-006", "device": "ESP32-S3-TRACKER-07", "temp_offset": 0.2, "humidity": 55.0, "location": "Agra Transit Hub, UP"},
+    {"code": "PRCL-2024-05-21-008", "device": "ESP32-S3-TRACKER-08", "temp_offset": 0.3, "humidity": 63.0, "location": "Visakhapatnam Port Hub, AP"},
+    {"code": "PRCL-2024-05-21-009", "device": "ESP32-S3-TRACKER-09", "temp_offset": 0.0, "humidity": 60.0, "location": "Vijayawada Transit Yard, AP"},
+    {"code": "PRCL-2024-05-21-010", "device": "ESP32-S3-TRACKER-10", "temp_offset": -0.1, "humidity": 54.0, "location": "Agra Transit Hub, UP"},
 ]
+if not SIMULATE_ALL:
+    SHIPMENT_CONFIGS = SHIPMENT_CONFIGS[:1]
 
-# Track live state for smooth natural drift across polling cycles
-states = {}
-for cfg in SHIPMENT_CONFIGS:
-    states[cfg["code"]] = {
-        "temp": cfg["base_temp"],
-        "hum": cfg["base_hum"],
-        "cycle": 0
+states = {cfg["code"]: {"temp": TARGET_TEMP_C + cfg["temp_offset"], "humidity": cfg["humidity"], "cycle": 0} for cfg in SHIPMENT_CONFIGS}
+
+
+def bounded_mean_reversion(value, target, noise, minimum, maximum):
+    next_value = value + 0.12 * (target - value) + random.gauss(0.0, noise)
+    return max(minimum, min(maximum, next_value))
+
+
+def make_payload(cfg, state):
+    state["cycle"] += 1
+    target = TARGET_TEMP_C + cfg["temp_offset"] + 0.25 * math.sin(state["cycle"] / 40.0)
+    state["temp"] = bounded_mean_reversion(state["temp"], target, 0.035, target - 0.8, target + 0.8)
+    humidity_target = cfg["humidity"] - (state["temp"] - target) * 1.5
+    state["humidity"] = bounded_mean_reversion(state["humidity"], humidity_target, 0.10, 35.0, 80.0)
+    tamper_open = DEMO_TAMPER and 24 <= state["cycle"] % 60 < 30
+    ldr_raw = random.randint(90, 220) if tamper_open else random.randint(3800, 4095)
+    shock = random.random() < 0.01
+    if shock:
+        ax, ay = random.uniform(-2.8, 2.8), random.uniform(-2.8, 2.8)
+        az = random.uniform(0.6, 1.5)
+        gx, gy, gz = (random.uniform(-90, 90) for _ in range(3))
+    else:
+        ax, ay = random.gauss(0, 0.012), random.gauss(0, 0.012)
+        az = random.gauss(1.0, 0.012)
+        gx, gy, gz = (random.gauss(0, 0.25) for _ in range(3))
+    shock_g = math.sqrt(ax * ax + ay * ay)
+    return {
+        "event_id": f"SIM-{cfg['device']}-{uuid.uuid4().hex}",
+        "firmware_version": "tracksure-simulator-2", "signature_status": "simulated",
+        "device_id": cfg["device"], "shipment_code": cfg["code"],
+        "temperature": round(state["temp"], 1), "humidity": round(state["humidity"], 1),
+        "ldr_raw": ldr_raw, "light_lux": 1000.0 if tamper_open else 0.0,
+        "accel_g": round(math.sqrt(ax * ax + ay * ay + az * az), 3),
+        "accel_x_g": round(ax, 3), "accel_y_g": round(ay, 3), "accel_z_g": round(az, 3),
+        "gyro_dps": round(math.sqrt(gx * gx + gy * gy + gz * gz), 2),
+        "gyro_x_dps": round(gx, 2), "gyro_y_dps": round(gy, 2), "gyro_z_dps": round(gz, 2),
+        "shock_reading_g": round(shock_g, 3), "shock_detected": shock_g >= 1.2,
+        "warehouse_location": cfg["location"],
     }
 
-print(f"Starting calibrated multi-shipment ESP32-S3 simulator ({len(SHIPMENT_CONFIGS)} shipments)...")
-print("Target Ranges: Cold-chain Temp 2.0°C–8.0°C | Humidity 45%–65% | Sealed Light 0 LUX (Tamper 1000 LUX) | Accel ~1.00g\n")
 
+def send(payload):
+    request = urllib.request.Request(API_URL, data=json.dumps(payload, allow_nan=False).encode("utf-8"), headers={
+        "Content-Type": "application/json", "x-device-key": DEVICE_KEY,
+        "Idempotency-Key": payload["event_id"], "User-Agent": "TrackSure-Simulator/2",
+    })
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+print(f"TrackSure simulator -> {API_URL}")
+print(f"Shipments: {len(SHIPMENT_CONFIGS)} | ambient target: {TARGET_TEMP_C:.1f} C | interval: {SEND_INTERVAL_S:.0f} s")
 while True:
-    for cfg in SHIPMENT_CONFIGS:
-        code = cfg["code"]
-        st = states[code]
-        st["cycle"] += 1
-
+    started = time.monotonic()
+    for config in SHIPMENT_CONFIGS:
+        payload = make_payload(config, states[config["code"]])
         try:
-            # 1. Natural temperature drift (+-0.15C) within strict 2.0C - 7.5C
-            temp_delta = round(random.uniform(-0.15, 0.15), 2)
-            st["temp"] = round(max(2.5, min(7.2, st["temp"] + temp_delta)), 1)
-
-            # 2. Natural humidity drift (+-0.3%) within 45% - 62%
-            hum_delta = round(random.uniform(-0.3, 0.3), 2)
-            st["hum"] = round(max(45.0, min(62.0, st["hum"] + hum_delta)), 1)
-
-            # 3. Light & Seal Status logic:
-            # Standard shipments remain 0.0 LUX (Container Sealed / Intact).
-            # PRCL-004 cycles between Intact (0 LUX) and Tampered (1000 LUX) every 20 cycles for dynamic demonstration.
-            if cfg["demo_tamper"]:
-                phase = st["cycle"] % 40
-                if 20 <= phase < 35:
-                    light = 1000.0  # Container open / breached
-                    temp_val = round(st["temp"] + 2.5, 1)  # Warm-up due to lid open
-                else:
-                    light = 0.0     # Container resealed / intact
-                    temp_val = st["temp"]
-            else:
-                light = 0.0
-                temp_val = st["temp"]
-
-            # 4. Realistic 3-Axis MPU6050 readings:
-            # Stationary cargo: Z-axis = 0.98g - 1.02g (gravity), X/Y minor vibration (~0.01 - 0.04g)
-            # Occasional transit bump (4% chance)
-            is_bump = random.random() < 0.04
-            if is_bump:
-                ax = round(random.uniform(-0.25, 0.25), 3)
-                ay = round(random.uniform(-0.25, 0.25), 3)
-                az = round(random.uniform(1.10, 1.35), 3)
-                gx = round(random.uniform(1.0, 3.5), 2)
-                gy = round(random.uniform(1.0, 3.5), 2)
-                gz = round(random.uniform(0.5, 2.0), 2)
-            else:
-                ax = round(random.uniform(-0.03, 0.03), 3)
-                ay = round(random.uniform(-0.03, 0.03), 3)
-                az = round(random.uniform(0.97, 1.03), 3)
-                gx = round(random.uniform(0.05, 0.40), 2)
-                gy = round(random.uniform(0.05, 0.40), 2)
-                gz = round(random.uniform(0.02, 0.25), 2)
-
-            accel_mag = round(math.sqrt(ax**2 + ay**2 + az**2), 2)
-            gyro_mag = round(math.sqrt(gx**2 + gy**2 + gz**2), 2)
-
-            payload = {
-                "device_id": cfg["device"],
-                "shipment_code": code,
-                "light_lux": light,
-                "temperature": temp_val,
-                "humidity": st["hum"],
-                "accel_g": accel_mag,
-                "accel_x_g": ax,
-                "accel_y_g": ay,
-                "accel_z_g": az,
-                "gyro_dps": gyro_mag,
-                "gyro_x_dps": gx,
-                "gyro_y_dps": gy,
-                "gyro_z_dps": gz,
-                "warehouse_location": cfg["location"],
-            }
-
-            req = urllib.request.Request(
-                API_URL,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json", "x-device-key": DEVICE_KEY},
-            )
-
-            with urllib.request.urlopen(req, timeout=3) as response:
-                result = json.loads(response.read().decode("utf-8"))
-
-            status_str = "BREACH" if light >= 800 else "INTACT"
-            print(f"[SIM] {code} | T={temp_val}°C H={st['hum']}% L={light:.0f}Lux [{status_str}] A={accel_mag}g | {result.get('health_level')}")
-
+            result = send(payload)
+            seal = "OPEN" if payload["ldr_raw"] < 2500 else "SEALED"
+            print(f"[SIM] {config['code']} T={payload['temperature']:.1f} C RH={payload['humidity']:.1f}% LDR={payload['ldr_raw']} {seal} shock={payload['shock_reading_g']:.3f}g -> {result.get('status')}")
+        except urllib.error.HTTPError as exc:
+            print(f"[SIM HTTP {exc.code}] {config['code']}: {exc.read().decode('utf-8', 'replace')[:200]}")
         except Exception as exc:
-            print(f"[SIM WAITING] {code}: {exc}")
-
-    time.sleep(1)
+            print(f"[SIM WAITING] {config['code']}: {type(exc).__name__}: {exc}")
+    time.sleep(max(0.1, SEND_INTERVAL_S - (time.monotonic() - started)))

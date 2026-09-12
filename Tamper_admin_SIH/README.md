@@ -1,6 +1,6 @@
 # SafeTrack — SIH Demo
 
-SafeTrack is a shipment-condition monitoring prototype built around FastAPI, SQLAlchemy, SQLite for the local demo, ESP32-S3 sensor input/simulation, JWT authentication, and separate Admin/User dashboards.
+SafeTrack is a shipment-condition monitoring prototype built around FastAPI, SQLAlchemy, PostgreSQL for deployment, ESP32-S3 sensor input, JWT authentication, and separate Admin/User dashboards.
 
 ## Run the complete local demo
 
@@ -35,13 +35,20 @@ The prototype intentionally has only two application roles: `admin` and `user`.
 
 ## Demo architecture
 
-ESP32-S3 simulator → FastAPI → SQLite/SQLAlchemy → Admin + User dashboards.
+ESP32-S3 → laptop USB gateway → FastAPI → PostgreSQL/SQLAlchemy → Admin + User dashboards.
 
 Each shipment has independent telemetry and its own hash chain, even when multiple shipments share a vehicle.
 
 ## Production deployment
 
-For deployment, move the database from SQLite to managed PostgreSQL, store `JWT_SECRET` and device credentials in environment/secret storage, restrict CORS to the deployed domains, and serve the application over HTTPS.
+For deployment, set `DATABASE_URL` to a managed PostgreSQL connection string. Also set unique `JWT_SECRET` and `DEVICE_API_KEY` values in Render's environment settings. The code accepts provider URLs beginning with either `postgres://` or `postgresql://` and uses psycopg 3.
+
+To copy an existing local SQLite database once:
+
+```powershell
+$env:DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require"
+python backend/migrate_sqlite_to_postgres.py --sqlite backend/safetrack.db
+```
 
 ## Notes
 

@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 from database import Base, SessionLocal, engine, get_db
@@ -26,32 +26,33 @@ app.add_middleware(
 )
 
 SEAL_TAMPER_LUX_THRESHOLD = 800.0
-DEMO_RESET = os.getenv("DEMO_RESET", "true").lower() == "true"
+DEMO_RESET = os.getenv("DEMO_RESET", "false").lower() == "true"
+DEVICE_API_KEY = os.getenv("DEVICE_API_KEY", "secret_device_key_esp32_2026")
 
 # Ensure Tables exist
 Base.metadata.create_all(bind=engine)
 
 def ensure_schema_migrations():
-    """Dynamically add new MPU6050 and orientation columns to SQLite if they do not exist."""
+    """Add telemetry columns on both PostgreSQL and legacy SQLite databases."""
     try:
-        with engine.connect() as conn:
-            cursor = conn.execute(text("PRAGMA table_info(sensor_events)"))
-            existing_cols = {row[1] for row in cursor.fetchall()}
+        existing_cols = {column["name"] for column in inspect(engine).get_columns("sensor_events")}
+        with engine.begin() as conn:
             new_cols = {
-                "accel_x": "REAL DEFAULT 0.0",
-                "accel_y": "REAL DEFAULT 0.0",
-                "accel_z": "REAL DEFAULT 1.0",
-                "gyro_x": "REAL DEFAULT 0.0",
-                "gyro_y": "REAL DEFAULT 0.0",
-                "gyro_z": "REAL DEFAULT 0.0",
-                "shock_g": "REAL DEFAULT 0.0",
-                "pitch": "REAL DEFAULT 0.0",
-                "roll": "REAL DEFAULT 0.0",
+                "event_id": "VARCHAR(128)",
+                "accel_x": "FLOAT DEFAULT 0.0",
+                "accel_y": "FLOAT DEFAULT 0.0",
+                "accel_z": "FLOAT DEFAULT 1.0",
+                "gyro_x": "FLOAT DEFAULT 0.0",
+                "gyro_y": "FLOAT DEFAULT 0.0",
+                "gyro_z": "FLOAT DEFAULT 0.0",
+                "shock_g": "FLOAT DEFAULT 0.0",
+                "pitch": "FLOAT DEFAULT 0.0",
+                "roll": "FLOAT DEFAULT 0.0",
             }
             for col_name, col_def in new_cols.items():
                 if col_name not in existing_cols:
                     conn.execute(text(f"ALTER TABLE sensor_events ADD COLUMN {col_name} {col_def}"))
-            conn.commit()
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_sensor_events_event_id ON sensor_events (event_id)"))
     except Exception as exc:
         print(f"[SCHEMA MIGRATION NOTE] {exc}")
 
@@ -111,7 +112,7 @@ def startup_db_seed():
         for i in range(1, 11):
             device_id = f"ESP32-S3-TRACKER-{i:02d}"
             if not db.query(Device).filter(Device.device_id == device_id).first():
-                db.add(Device(device_id=device_id, api_key="secret_device_key_esp32_2026"))
+                db.add(Device(device_id=device_id, api_key=DEVICE_API_KEY))
 
         # Seed Default Vehicles
         initial_vehicles = [
@@ -204,6 +205,7 @@ class UserCreatePayload(BaseModel):
 
 
 class GPSSensorIngestPayload(BaseModel):
+    event_id: Optional[str] = None
     device_id: str
     shipment_code: str
     temperature: float = 24.0
@@ -1099,15 +1101,21 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
         or getattr(data, "api_key", None)
     )
 
-    valid_device_keys = {
-        device.api_key.strip(),
-        "secret_device_key_esp32_2026",
-        "YOUR_DEVICE_SECRET_KEY"
-    }
+    valid_device_keys = {device.api_key.strip()}
 
     if not provided_key or provided_key.strip() not in valid_device_keys:
         print(f"[AUTH ERROR] Invalid key for device {data.device_id}. Provided: {provided_key!r}, Expected one of: {valid_device_keys}. Headers: {dict(request.headers)}")
         raise HTTPException(status_code=401, detail="Invalid device key")
+
+    if data.event_id:
+        previous_event = db.query(SensorEvent).filter(SensorEvent.event_id == data.event_id).first()
+        if previous_event:
+            return {
+                "status": "success",
+                "duplicate": True,
+                "event_hash": previous_event.record_hash,
+                "health_level": previous_event.health_level,
+            }
 
     shipment = db.query(Shipment).filter(Shipment.shipment_code == data.shipment_code).first()
     if not shipment:
@@ -1162,6 +1170,7 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
     curr_hash = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
 
     event = SensorEvent(
+        event_id=data.event_id,
         shipment_id=shipment.id,
         device_id=data.device_id,
         light_lux=effective_light,
