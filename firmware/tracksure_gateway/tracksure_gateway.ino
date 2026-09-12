@@ -57,9 +57,12 @@ const char* WAREHOUSE_LOCATION = "Rewari Transit Hub, HR";
 #define SHOCK_COOLDOWN_MS 1000
 
 const unsigned long DHT_INTERVAL_MS = 2000;
-const unsigned long SEND_INTERVAL_MS = 5000;
+// A 500 ms signed sample keeps the remote orientation display responsive while
+// the DHT is still read at its safe 2 second cadence.
+const unsigned long SEND_INTERVAL_MS = 500;
 const unsigned long WIFI_RETRY_INTERVAL_MS = 10000;
 const unsigned long MPU_RETRY_INTERVAL_MS = 15000;
+const unsigned long ATECC_RETRY_INTERVAL_MS = 3000;
 
 // =====================================================
 // 5. MPU6050 REGISTERS
@@ -87,6 +90,7 @@ unsigned long lastDHTRead = 0;
 unsigned long lastSendTime = 0;
 unsigned long lastWiFiAttempt = 0;
 unsigned long lastMpuRetryTime = 0;
+unsigned long lastAteccRetryTime = 0;
 
 // Horizontal baseline. Z is not used.
 float baselineAx = 0.0;
@@ -446,6 +450,7 @@ bool sendSensorData(
 
     uint8_t signature[64];
     if (!ECCX08.ecSign(ATECC_KEY_SLOT, digest, signature)) {
+        ateccAvailable = false;
         Wire.setClock(I2C_CLOCK_HZ);
         Serial.println("[ATECC] Slot 0 signing failed; telemetry not queued.");
         return false;
@@ -548,6 +553,18 @@ void setup()
 
 void loop()
 {
+
+    // The USB serial connection can reset the ESP while the secure element is
+    // still waking. Retry enrollment locally instead of remaining unsigned.
+    if (!ateccAvailable && millis() - lastAteccRetryTime >= ATECC_RETRY_INTERVAL_MS)
+    {
+        lastAteccRetryTime = millis();
+        Wire.setClock(I2C_CLOCK_HZ);
+        ateccAvailable = ECCX08.begin();
+        Wire.setClock(I2C_CLOCK_HZ);
+        Serial.println(ateccAvailable ? "[ATECC] Ready after retry; signed telemetry enabled."
+                                     : "[ATECC] Retry failed; unsigned telemetry remains disabled.");
+    }
 
 
     // -------------------------------------------------

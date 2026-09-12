@@ -138,7 +138,7 @@ function startRefresh() {
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(() => {
     if (!document.hidden && authToken && currentShipmentCode) fetchShipmentData();
-  }, 5000);
+  }, 500);
 }
 
 function populateShipmentSelector() {
@@ -757,20 +757,19 @@ function renderPackageOrientation(telemetry) {
   if ($("packageGyroVal")) $("packageGyroVal").textContent = Number.isFinite(gyro) ? `${gyro.toFixed(1)} °/s` : "— °/s";
   if ($("packageLastSync")) $("packageLastSync").textContent = formatTime(lastMPUEventTime);
 
-  // 1. Calculate realistic Pitch & Roll from acceleration vector
-  // Normal stationary upright package has ~1.0g gravity vector along Y
-  // If tilted or shocked, the vector deviates
-  if (Number.isFinite(accel)) {
-    const deviation = accel - 1.0;
-    
-    // Proportional tilt representation:
-    // When accel deviation is within 0.1g, package is upright (0-2° slight settle)
-    // Deviation scales to tilt degrees (max 45° tilt for visual clarity)
-    const rawPitch = Math.max(-45, Math.min(45, deviation * 28));
-    const rawRoll = Math.max(-45, Math.min(45, (gyro || 0) * 0.5));
-
-    targetPitchDeg = rawPitch;
-    targetRollDeg = rawRoll;
+  // Use the actual gravity vector. Magnitude and scalar gyro cannot identify
+  // direction, which made the old model move incorrectly.
+  const ax = Number(telemetry.accel_x);
+  const ay = Number(telemetry.accel_y);
+  const az = Number(telemetry.accel_z);
+  const suppliedPitch = Number(telemetry.pitch);
+  const suppliedRoll = Number(telemetry.roll);
+  if (Number.isFinite(suppliedPitch) && Number.isFinite(suppliedRoll)) {
+    targetPitchDeg = suppliedPitch;
+    targetRollDeg = suppliedRoll;
+  } else if ([ax, ay, az].every(Number.isFinite)) {
+    targetPitchDeg = Math.atan2(ay, Math.sqrt(ax * ax + az * az)) * 180 / Math.PI;
+    targetRollDeg = Math.atan2(-ax, Math.abs(az) < 0.0001 ? 0.0001 : az) * 180 / Math.PI;
   }
 
   // Update Angle displays
@@ -834,7 +833,7 @@ function animatePackageScene() {
   // Smoothly interpolate physical orientation to target angles (NO fake continuous rotation)
   // Package remains completely stable when sensor is stable
   if (packageMesh) {
-    const lerpSpeed = 0.08;
+    const lerpSpeed = 0.22;
     currentPitchDeg += (targetPitchDeg - currentPitchDeg) * lerpSpeed;
     currentRollDeg += (targetRollDeg - currentRollDeg) * lerpSpeed;
 

@@ -1,26 +1,17 @@
-#include <WiFi.h>
-#include <HTTPClient.h>
 #include <Wire.h>
 #include <DHT.h>
 #include <ArduinoJson.h>
+#include <ArduinoECCX08.h>
+#include <mbedtls/base64.h>
+#include <mbedtls/sha256.h>
 #include <math.h>
+#include <esp_system.h>
 
 // =====================================================
 // 1. WIFI AND SERVER SETTINGS
 // =====================================================
 
-// Archived Wi-Fi firmware. Use firmware/tracksure_gateway for the USB gateway.
-// Keep actual Wi-Fi credentials in a local, untracked copy.
-const char* WIFI_SSID = "YOUR_WIFI_SSID";
-const char* WIFI_PASS = "YOUR_WIFI_PASSWORD";
-
-// Example for a FastAPI server running on your laptop/server.
-// Do NOT use localhost or 127.0.0.1 here because, from the
-// ESP32's perspective, that would refer to the ESP32 itself.
-const char* SERVER_URL = "http://192.168.137.113:8000/api/events";
-
-// Optional custom header used by your FastAPI backend.
-const char* DEVICE_KEY = "YOUR_DEVICE_SECRET_KEY";
+// USB gateway mode: network credentials stay on the laptop.
 
 // =====================================================
 // 2. DEVICE INFORMATION
@@ -45,6 +36,7 @@ const char* WAREHOUSE_LOCATION = "Rewari Transit Hub, HR";
 
 // LDR
 #define LDR_PIN 4
+#define ATECC_KEY_SLOT 0
 
 // =====================================================
 // 4. SENSOR AND TIMING SETTINGS
@@ -65,9 +57,12 @@ const char* WAREHOUSE_LOCATION = "Rewari Transit Hub, HR";
 #define SHOCK_COOLDOWN_MS 1000
 
 const unsigned long DHT_INTERVAL_MS = 2000;
-const unsigned long SEND_INTERVAL_MS = 5000;
+// A 500 ms signed sample keeps the remote orientation display responsive while
+// the DHT is still read at its safe 2 second cadence.
+const unsigned long SEND_INTERVAL_MS = 500;
 const unsigned long WIFI_RETRY_INTERVAL_MS = 10000;
 const unsigned long MPU_RETRY_INTERVAL_MS = 15000;
+const unsigned long ATECC_RETRY_INTERVAL_MS = 3000;
 
 // =====================================================
 // 5. MPU6050 REGISTERS
@@ -85,6 +80,7 @@ const unsigned long MPU_RETRY_INTERVAL_MS = 15000;
 DHT dht(DHTPIN, DHTTYPE);
 
 bool mpuAvailable = false;
+bool ateccAvailable = false;
 
 // Latest valid DHT values
 float temperature = NAN;
@@ -94,6 +90,7 @@ unsigned long lastDHTRead = 0;
 unsigned long lastSendTime = 0;
 unsigned long lastWiFiAttempt = 0;
 unsigned long lastMpuRetryTime = 0;
+unsigned long lastAteccRetryTime = 0;
 
 // Horizontal baseline. Z is not used.
 float baselineAx = 0.0;
@@ -101,6 +98,41 @@ float baselineAy = 0.0;
 bool baselineReady = false;
 
 unsigned long lastShockTime = 0;
+unsigned long lastValidDHT = 0;
+bool pendingShock = false;
+float pendingPeak = 0;
+uint32_t eventSequence = 0;
+char bootId[17];
+struct OutgoingRecord { char data[2048]; char id[100]; };
+QueueHandle_t outgoing;
+
+// Dedicated task keeps serial upload/ACK waits out of the sensor loop.
+void relayTask(void*) {
+    OutgoingRecord record;
+    String reply;
+    for (;;) {
+        if (xQueueReceive(outgoing, &record, portMAX_DELAY) != pdTRUE) continue;
+        bool acknowledged = false;
+        while (!acknowledged) {
+            Serial.print("TRACKSURE ");
+            Serial.println(record.data);
+            unsigned long began = millis();
+            while (millis() - began < 2500) {
+                while (Serial.available()) {
+                    char ch = Serial.read();
+                    if (ch == '\n') {
+                        reply.trim();
+                        if (reply == String("ACK ") + record.id) acknowledged = true;
+                        reply = "";
+                    } else if (reply.length() < 150) reply += ch;
+                    else reply = "";
+                }
+                if (acknowledged) break;
+                vTaskDelay(pdMS_TO_TICKS(10));
+            }
+        }
+    }
+}
 
 // =====================================================
 // 7. I2C / MPU6050 HELPERS
@@ -306,36 +338,6 @@ float calculateXYShock(float ax, float ay)
 // 9. WIFI FUNCTIONS
 // =====================================================
 
-void startWiFiConnection()
-{
-    Serial.printf("[WiFi] Connecting to: %s\n", WIFI_SSID);
-
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
-}
-
-void maintainWiFi()
-{
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        return;
-    }
-
-    if (millis() - lastWiFiAttempt < WIFI_RETRY_INTERVAL_MS)
-    {
-        return;
-    }
-
-    lastWiFiAttempt = millis();
-
-    Serial.println("[WiFi] Disconnected; attempting reconnect.");
-
-    WiFi.disconnect();
-    delay(100);
-
-    startWiFiConnection();
-}
-
 // =====================================================
 // 10. HTTP JSON SENDING
 // =====================================================
@@ -353,15 +355,18 @@ bool sendSensorData(
     bool mpuReadOk
 )
 {
-    if (WiFi.status() != WL_CONNECTED)
-    {
-        Serial.println("[HTTP] Not sent: Wi-Fi unavailable.");
-        return false;
-    }
-
+    // Do not upload stale/invalid temperature as a plausible measurement.
+    if (isnan(temperature) || isnan(humidity) || millis()-lastValidDHT > 10000) return false;
     // Increase capacity if your FastAPI API needs more JSON fields.
     StaticJsonDocument<1024> doc;
 
+    doc["event_id"] = String(DEVICE_ID) + "-" + bootId + "-" + String(eventSequence);
+    doc["boot_id"] = bootId;
+    doc["sequence"] = eventSequence;
+    doc["uptime_ms"] = millis();
+    doc["firmware_version"] = "tracksure-usb-gateway-2-signed";
+    doc["signature_status"] = "atecc608a-slot-0";
+    doc["temperature_age_ms"] = millis()-lastValidDHT;
     doc["device_id"] = DEVICE_ID;
     doc["shipment_code"] = SHIPMENT_CODE;
     doc["warehouse_location"] = WAREHOUSE_LOCATION;
@@ -383,9 +388,13 @@ bool sendSensorData(
     // Light    (~112 raw)  -> 1000 LUX
     float lightLux = (ldrRaw <= 500) ? 1000.0 : 0.0;
     doc["light_lux"] = lightLux;
+    doc["light_measurement_kind"] = "binary_exposure_proxy";
+    doc["ldr_raw"] = ldrRaw;
 
     doc["mpu_available"] = mpuAvailable;
     doc["mpu_read_ok"] = mpuReadOk;
+    doc["accel_g"] = mpuReadOk ? round(sqrt(ax * ax + ay * ay + az * az) * 1000.0) / 1000.0 : 1.0;
+    doc["gyro_dps"] = mpuReadOk ? round(sqrt(gx * gx + gy * gy + gz * gz) * 100.0) / 100.0 : 0.0;
 
     if (mpuReadOk)
     {
@@ -415,43 +424,68 @@ bool sendSensorData(
         doc["shock_axis_mode"] = "XY_only";
     }
 
-    String requestBody;
-    serializeJson(doc, requestBody);
-
-    Serial.println();
-    Serial.println("[HTTP] JSON payload:");
-    Serial.println(requestBody);
-
-    HTTPClient http;
-
-    http.begin(SERVER_URL);
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("x-device-key", DEVICE_KEY);
-    http.setTimeout(5000);
-
-    int responseCode = http.POST(requestBody);
-
-    if (responseCode > 0)
-    {
-        String response = http.getString();
-
-        Serial.printf("[HTTP] Response code: %d\n", responseCode);
-        Serial.println("[HTTP] Server response:");
-        Serial.println(response);
-
-        http.end();
-
-        return responseCode >= 200 && responseCode < 300;
+    if (!ateccAvailable) {
+        Serial.println("[ATECC] Refusing unsigned telemetry: secure element unavailable.");
+        return false;
     }
 
-    Serial.printf(
-        "[HTTP] Request failed: %s\n",
-        http.errorToString(responseCode).c_str()
-    );
+    // Sign the exact JSON bytes transported inside record_b64. The laptop
+    // verifies SHA256("TrackSure:event:v1\\0" || record_bytes) with slot 0's
+    // enrolled P-256 public key before it accepts or forwards the record.
+    String signedRecord;
+    serializeJson(doc, signedRecord);
+    const char domain[] = "TrackSure:event:v1";
+    uint8_t digest[32];
+    mbedtls_sha256_context sha;
+    mbedtls_sha256_init(&sha);
+    if (mbedtls_sha256_starts(&sha, 0) != 0 ||
+        mbedtls_sha256_update(&sha, reinterpret_cast<const uint8_t*>(domain), sizeof(domain)) != 0 ||
+        mbedtls_sha256_update(&sha, reinterpret_cast<const uint8_t*>(signedRecord.c_str()), signedRecord.length()) != 0 ||
+        mbedtls_sha256_finish(&sha, digest) != 0) {
+        mbedtls_sha256_free(&sha);
+        Serial.println("[ATECC] SHA-256 failed.");
+        return false;
+    }
+    mbedtls_sha256_free(&sha);
 
-    http.end();
+    uint8_t signature[64];
+    if (!ECCX08.ecSign(ATECC_KEY_SLOT, digest, signature)) {
+        ateccAvailable = false;
+        Wire.setClock(I2C_CLOCK_HZ);
+        Serial.println("[ATECC] Slot 0 signing failed; telemetry not queued.");
+        return false;
+    }
+    // ArduinoECCX08 raises non-AVR I2C to 1 MHz internally. Restore the
+    // shared bus to a speed supported by the MPU sensor before the next read.
+    Wire.setClock(I2C_CLOCK_HZ);
 
-    return false;
+    size_t recordB64Length = 0, signatureB64Length = 0;
+    char recordB64[1400];
+    char signatureB64[96];
+    if (mbedtls_base64_encode(reinterpret_cast<uint8_t*>(recordB64), sizeof(recordB64) - 1, &recordB64Length,
+        reinterpret_cast<const uint8_t*>(signedRecord.c_str()), signedRecord.length()) != 0 ||
+        mbedtls_base64_encode(reinterpret_cast<uint8_t*>(signatureB64), sizeof(signatureB64) - 1, &signatureB64Length,
+        signature, sizeof(signature)) != 0) {
+        Serial.println("[ATECC] Base64 envelope failed.");
+        return false;
+    }
+    recordB64[recordB64Length] = '\0';
+    signatureB64[signatureB64Length] = '\0';
+    StaticJsonDocument<1600> envelope;
+    envelope["record_b64"] = recordB64;
+    envelope["signature_b64"] = signatureB64;
+    envelope["signature_algorithm"] = "ECDSA_P256_SHA256";
+    envelope["key_slot"] = ATECC_KEY_SLOT;
+    String requestBody;
+    serializeJson(envelope, requestBody);
+
+    OutgoingRecord record{};
+    if (requestBody.length() >= sizeof(record.data)) return false;
+    requestBody.toCharArray(record.data, sizeof(record.data));
+    String(doc["event_id"].as<const char*>()).toCharArray(record.id, sizeof(record.id));
+    if (xQueueSend(outgoing, &record, 0) != pdTRUE) return false;
+    eventSequence++;
+    return true;
 }
 
 // =====================================================
@@ -461,12 +495,17 @@ bool sendSensorData(
 void setup()
 {
     Serial.begin(115200);
-    delay(1500);
+    unsigned long serialStart = millis();
+    while (!Serial && millis() - serialStart < 3000) {
+        delay(10);
+    }
+    delay(300);
+    Serial.println("TRACKSURE_BOOT");
 
     Serial.println();
     Serial.println("========================================");
     Serial.println(" SafeTrack ESP32-S3 Sensor Node");
-    Serial.println(" DHT11 + LDR + MPU6050 + WiFi + HTTP");
+    Serial.println(" DHT11 + LDR + MPU6050 + USB laptop relay");
     Serial.println(" Direct MPU6050 I2C / XY Shock Mode");
     Serial.println("========================================");
 
@@ -481,6 +520,15 @@ void setup()
     delay(200);
     scanI2CBus();
 
+    Serial.println("[ATECC] Initializing secure element...");
+    ateccAvailable = ECCX08.begin();
+    Wire.setClock(I2C_CLOCK_HZ);
+    if (ateccAvailable) {
+        Serial.println("[ATECC] Ready; slot 0 signatures required.");
+    } else {
+        Serial.println("[ATECC] Initialization failed; unsigned telemetry is disabled.");
+    }
+
     mpuAvailable = initMPU6050();
 
     // DHT11
@@ -492,37 +540,11 @@ void setup()
     analogReadResolution(12);
     Serial.printf("[LDR] Initialized on GPIO %d\n", LDR_PIN);
 
-    // Wi-Fi
-    startWiFiConnection();
-
-    // Wait up to 15 seconds during startup, but do not freeze forever.
-    unsigned long wifiStartTime = millis();
-
-    while (
-        WiFi.status() != WL_CONNECTED &&
-        millis() - wifiStartTime < 15000
-    )
-    {
-        delay(500);
-        Serial.print(".");
-    }
-
-    Serial.println();
-
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        Serial.println("[WiFi] Connected.");
-        Serial.print("[WiFi] ESP32 IP address: ");
-        Serial.println(WiFi.localIP());
-    }
-    else
-    {
-        Serial.println("[WiFi] Not connected yet; background reconnect will continue.");
-    }
-
-    Serial.println("========================================");
-    Serial.println("SYSTEM READY");
-    Serial.println("========================================");
+    snprintf(bootId, sizeof(bootId), "%08lx%08lx", (unsigned long)esp_random(), (unsigned long)esp_random());
+    outgoing = xQueueCreate(32, sizeof(OutgoingRecord));
+    if (!outgoing) { Serial.println("QUEUE ALLOCATION FAILED"); while(true) delay(1000); }
+    xTaskCreate(relayTask, "USB relay", 6144, nullptr, 1, nullptr);
+    Serial.println("USB gateway ready. Run gateway/start-gateway.cmd; close Serial Monitor.");
 }
 
 // =====================================================
@@ -531,7 +553,19 @@ void setup()
 
 void loop()
 {
-    maintainWiFi();
+
+    // The USB serial connection can reset the ESP while the secure element is
+    // still waking. Retry enrollment locally instead of remaining unsigned.
+    if (!ateccAvailable && millis() - lastAteccRetryTime >= ATECC_RETRY_INTERVAL_MS)
+    {
+        lastAteccRetryTime = millis();
+        Wire.setClock(I2C_CLOCK_HZ);
+        ateccAvailable = ECCX08.begin();
+        Wire.setClock(I2C_CLOCK_HZ);
+        Serial.println(ateccAvailable ? "[ATECC] Ready after retry; signed telemetry enabled."
+                                     : "[ATECC] Retry failed; unsigned telemetry remains disabled.");
+    }
+
 
     // -------------------------------------------------
     // A. Reinitialize MPU periodically if unavailable
@@ -571,6 +605,7 @@ void loop()
         {
             temperature = newTemperature;
             humidity = newHumidity;
+            lastValidDHT = millis();
         }
         else
         {
@@ -599,7 +634,7 @@ void loop()
 
     if (mpuAvailable && !mpuReadOk)
     {
-        Serial.println("[MPU] Sensor read failed.");
+        mpuAvailable = false; // enables the existing retry branch
     }
 
     // -------------------------------------------------
@@ -621,67 +656,26 @@ void loop()
             shockDetected = true;
             lastShockTime = millis();
 
-            Serial.println("[SHOCK] XY shock detected.");
+            pendingShock = true;
         }
     }
 
     // -------------------------------------------------
-    // F. Send once every five seconds
+    // F. Queue a snapshot every five seconds; keep peaks between snapshots
     // -------------------------------------------------
 
+    pendingPeak = max(pendingPeak, shockG);
     if (millis() - lastSendTime >= SEND_INTERVAL_MS)
     {
         lastSendTime = millis();
 
-        Serial.println();
-        Serial.println("----------------------------------------");
-
-        if (!isnan(temperature))
-        {
-            Serial.printf("[DHT] Temperature: %.1f C\n", temperature);
-            Serial.printf("[DHT] Humidity   : %.1f %%\n", humidity);
+        if (sendSensorData(ldrRaw, ax, ay, az, gx, gy, gz,
+                           pendingPeak, pendingShock, mpuReadOk)) {
+            pendingPeak = 0;
+            pendingShock = false;
         }
-        else
-        {
-            Serial.println("[DHT] No valid reading yet.");
-        }
-
-        float lightLux = (ldrRaw <= 500) ? 1000.0 : 0.0;
-        Serial.printf("[LDR] Raw value   : %d / 4095\n", ldrRaw);
-        Serial.printf("[LDR] Light level : %.0f LUX\n", lightLux);
-
-        if (mpuReadOk)
-        {
-            Serial.printf("[MPU] Accel X     : %.3f g\n", ax);
-            Serial.printf("[MPU] Accel Y     : %.3f g\n", ay);
-            Serial.printf("[MPU] Accel Z     : %.3f g (ignored for shock)\n", az);
-
-            Serial.printf("[MPU] Gyro X      : %.2f deg/s\n", gx);
-            Serial.printf("[MPU] Gyro Y      : %.2f deg/s\n", gy);
-            Serial.printf("[MPU] Gyro Z      : %.2f deg/s\n", gz);
-
-            Serial.printf("[SHOCK] Reading   : %.3f g (XY only)\n", shockG);
-            Serial.printf(
-                "[SHOCK] Status    : %s\n",
-                shockDetected ? "SHOCK DETECTED" : "Normal"
-            );
-        }
-        else
-        {
-            Serial.println("[MPU] Unavailable or read failed.");
-            Serial.println("[SHOCK] Unavailable.");
-        }
-
-        sendSensorData(
-            ldrRaw,
-            ax, ay, az,
-            gx, gy, gz,
-            shockG,
-            shockDetected,
-            mpuReadOk
-        );
     }
 
     // Keep MPU sampling responsive while avoiding a CPU-hogging loop.
-    delay(1000);
+    delay(10);
 }

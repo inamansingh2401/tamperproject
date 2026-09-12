@@ -300,6 +300,10 @@ async function inspectShipment(code, silent = false) {
         const details = await SafeTrackAPI.getShipmentByCode(code);
         if (!details) return;
 
+        if (silent) {
+            updateAdminOrientation(details.latest_telemetry || null);
+            return;
+        }
         renderShipmentInspector(details);
 
         if (!silent) {
@@ -340,12 +344,12 @@ function renderShipmentInspector(details) {
     const latestHash = latest ? String(latest.record_hash || "—").substring(0, 16) + "..." : "Genesis";
     const prevHash = latest ? String(latest.previous_hash || "—").substring(0, 16) + "..." : "00000000...";
 
-    // Calculate orientation values from latest telemetry
+    // Calculate orientation from the directional gravity vector supplied by
+    // the backend. Scalar acceleration/gyro cannot determine package angle.
     const accelVal = latest ? Number(latest.accel_g) : 1.0;
     const gyroVal = latest ? Number(latest.gyro_dps) : 0.0;
-    const deviation = (Number.isFinite(accelVal) ? accelVal : 1.0) - 1.0;
-    const targetPitch = Math.max(-45, Math.min(45, deviation * 28));
-    const targetRoll = Math.max(-45, Math.min(45, gyroVal * 0.5));
+    const targetPitch = latest && Number.isFinite(Number(latest.pitch)) ? Number(latest.pitch) : 0;
+    const targetRoll = latest && Number.isFinite(Number(latest.roll)) ? Number(latest.roll) : 0;
     adminTargetPitch = targetPitch;
     adminTargetRoll = targetRoll;
 
@@ -605,7 +609,23 @@ function startInspectionAutoRefresh(code) {
             return;
         }
         await inspectShipment(code, true);
-    }, 3000);
+    }, 500);
+}
+
+function updateAdminOrientation(latest) {
+    if (!latest) return;
+    const ax = Number(latest.accel_x);
+    const ay = Number(latest.accel_y);
+    const az = Number(latest.accel_z);
+    const pitch = Number(latest.pitch);
+    const roll = Number(latest.roll);
+    if (Number.isFinite(pitch) && Number.isFinite(roll)) {
+        adminTargetPitch = pitch;
+        adminTargetRoll = roll;
+    } else if ([ax, ay, az].every(Number.isFinite)) {
+        adminTargetPitch = Math.atan2(ay, Math.sqrt(ax * ax + az * az)) * 180 / Math.PI;
+        adminTargetRoll = Math.atan2(-ax, Math.abs(az) < 0.0001 ? 0.0001 : az) * 180 / Math.PI;
+    }
 }
 
 function stopInspectionAutoRefresh() {
@@ -856,7 +876,7 @@ function animateAdminPackageScene() {
 
     // Physical orientation driven by real sensor telemetry (smooth lerp, no artificial endless rotation)
     if (adminPackageMesh) {
-        const lerpSpeed = 0.08;
+        const lerpSpeed = 0.22;
         adminCurrentPitch += (adminTargetPitch - adminCurrentPitch) * lerpSpeed;
         adminCurrentRoll += (adminTargetRoll - adminCurrentRoll) * lerpSpeed;
 
