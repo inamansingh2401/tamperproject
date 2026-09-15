@@ -1,10 +1,10 @@
 /**
  * SafeTrack Admin Console - Data API Layer
- * Connected directly to Python FastAPI Backend on https://safetrack-admin-c243.onrender.com
+ * Connected directly to Python FastAPI Backend on https://safetrack-api-live.vercel.app
  */
 
 const API_CONFIG = {
-    BASE_URL: 'https://safetrack-admin-c243.onrender.com/api',
+    BASE_URL: 'https://safetrack-api-live.vercel.app/api',
     USE_MOCK_DATA: false // Live FastAPI mode active
 };
 
@@ -237,8 +237,17 @@ const SafeTrackAPI = {
 
     async getLiveTelemetry(shipmentId) {
         if (!shipmentId) throw new Error('Choose a shipment');
-        const result = await this.getShipmentByCode(shipmentId);
+        const result = await this.getShipmentLive(shipmentId);
         return result.latest_telemetry;
+    },
+
+    async getShipmentLive(code) {
+        if (!API_CONFIG.USE_MOCK_DATA) {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/shipments/${encodeURIComponent(code)}/live`);
+            return await res.json();
+        }
+        const shipment = mockShipments.find(s => s.id === code) || mockShipments[0];
+        return { shipment, latest_telemetry: null };
     },
 
     async createShipment(shipmentData) {

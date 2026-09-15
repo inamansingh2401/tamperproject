@@ -141,7 +141,7 @@ async function handleAddUserSubmit(e) {
     try {
         // Older backends ignore this password and create a shared default login.
         // Fail safely until the security update has reached Render.
-        const schemaResponse = await fetchWithTimeout('https://safetrack-admin-c243.onrender.com/openapi.json', {cache: 'no-store'});
+        const schemaResponse = await fetchWithTimeout('https://safetrack-api-live.vercel.app/openapi.json', {cache: 'no-store'});
         const schema = await schemaResponse.json();
         if (!schemaResponse.ok || !schema.components?.schemas?.UserCreatePayload?.required?.includes('password')) {
             throw new Error('The backend security update must be deployed before creating new users.');

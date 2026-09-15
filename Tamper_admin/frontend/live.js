@@ -1,5 +1,5 @@
 'use strict';
-const API = 'https://safetrack-admin-c243.onrender.com/api';
+const API = 'https://safetrack-api-live.vercel.app/api';
 const $ = id => document.getElementById(id);
 let token = sessionStorage.getItem('safetrack_access_token');
 let busy = false, timer, lastReceipt = null, connected = false;
@@ -46,7 +46,7 @@ async function refresh(){
         }
         if(!lastReceipt)status('Reading received; cloud timestamp unavailable','stale');else freshness();
     }catch(error){connected=false;status('Cloud unavailable — values shown may be stale. '+error.message,'error');}
-    finally{busy=false;if(token)timer=setTimeout(refresh,requested!==$('shipment').value?0:document.hidden?15000:3000);}
+    finally{busy=false;if(token)timer=setTimeout(refresh,requested!==$('shipment').value?0:document.hidden?15000:500);}
 }
 async function start(assignments, role){
     $('login').hidden=true;$('monitor').hidden=false;$('shipment').replaceChildren();clearReadings();

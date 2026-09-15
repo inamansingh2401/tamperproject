@@ -1,10 +1,10 @@
-# SafeTrack — SIH Demo
+# SafeTrack
 
 SafeTrack is a shipment-condition monitoring prototype built around FastAPI, SQLAlchemy, PostgreSQL for deployment, ESP32-S3 sensor input, JWT authentication, and separate Admin/User dashboards.
 
 ## Run the complete local demo
 
-From the `Tamper_admin_SIH` root folder:
+From the `Tamper_admin` root folder:
 
 ```powershell
 python run_all.py
@@ -35,7 +35,7 @@ The prototype intentionally has only two application roles: `admin` and `user`.
 
 ## Demo architecture
 
-ESP32-S3 → laptop USB gateway → FastAPI → PostgreSQL/SQLAlchemy → Admin + User dashboards.
+ESP32-S3 → Wi-Fi → laptop gateway → HTTPS FastAPI → PostgreSQL/SQLAlchemy → Admin + User dashboards.
 
 Each shipment has independent telemetry and its own hash chain, even when multiple shipments share a vehicle.
 
@@ -46,7 +46,7 @@ For deployment, set `DATABASE_URL` to a managed PostgreSQL connection string. Al
 To copy an existing local SQLite database once:
 
 ```powershell
-$env:DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require"
+$env:DATABASE_URL="<managed PostgreSQL connection string with sslmode=require>"
 python backend/migrate_sqlite_to_postgres.py --sqlite backend/safetrack.db
 ```
 

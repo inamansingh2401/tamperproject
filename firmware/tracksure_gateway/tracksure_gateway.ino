@@ -6,12 +6,22 @@
 #include <mbedtls/sha256.h>
 #include <math.h>
 #include <esp_system.h>
+// Wi-Fi is the only production event transport. The ignored local settings
+// header keeps network credentials out of source control.
+#define TRACKSURE_ENABLE_WIFI 1
+#if TRACKSURE_ENABLE_WIFI && __has_include("wifi_secrets.local.h")
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include "wifi_secrets.local.h"
+#define TRACKSURE_WIFI 1
+#endif
 
 // =====================================================
 // 1. WIFI AND SERVER SETTINGS
 // =====================================================
 
-// USB gateway mode: network credentials stay on the laptop.
+// Production events use the ignored local Wi-Fi settings above; USB Serial is
+// retained only for development logs and firmware flashing.
 
 // =====================================================
 // 2. DEVICE INFORMATION
@@ -37,6 +47,10 @@ const char* WAREHOUSE_LOCATION = "Rewari Transit Hub, HR";
 // LDR
 #define LDR_PIN 4
 #define ATECC_KEY_SLOT 0
+// The deployed secure element is an ATECC508A. ArduinoECCX08 supports its
+// P-256 signing command through the same ecSign(slot, digest, signature) API
+// used for ATECC608 devices. Slot 0 contains the provisioned private key.
+#define ATECC_DEVICE_LABEL "atecc508a-slot-0"
 
 // =====================================================
 // 4. SENSOR AND TIMING SETTINGS
@@ -57,9 +71,8 @@ const char* WAREHOUSE_LOCATION = "Rewari Transit Hub, HR";
 #define SHOCK_COOLDOWN_MS 1000
 
 const unsigned long DHT_INTERVAL_MS = 2000;
-// A 500 ms signed sample keeps the remote orientation display responsive while
-// the DHT is still read at its safe 2 second cadence.
-const unsigned long SEND_INTERVAL_MS = 500;
+// A 1 second signed sample limits cloud backlog while remaining responsive.
+const unsigned long SEND_INTERVAL_MS = 1000;
 const unsigned long WIFI_RETRY_INTERVAL_MS = 10000;
 const unsigned long MPU_RETRY_INTERVAL_MS = 15000;
 const unsigned long ATECC_RETRY_INTERVAL_MS = 3000;
@@ -85,12 +98,15 @@ bool ateccAvailable = false;
 // Latest valid DHT values
 float temperature = NAN;
 float humidity = NAN;
+float filteredLdrRaw = NAN;
 
 unsigned long lastDHTRead = 0;
 unsigned long lastSendTime = 0;
 unsigned long lastWiFiAttempt = 0;
 unsigned long lastMpuRetryTime = 0;
 unsigned long lastAteccRetryTime = 0;
+uint8_t mpuReadFailures = 0;
+const uint8_t MPU_FAILURES_BEFORE_REINIT = 3;
 
 // Horizontal baseline. Z is not used.
 float baselineAx = 0.0;
@@ -106,30 +122,83 @@ char bootId[17];
 struct OutgoingRecord { char data[2048]; char id[100]; };
 QueueHandle_t outgoing;
 
-// Dedicated task keeps serial upload/ACK waits out of the sensor loop.
+#ifdef TRACKSURE_WIFI
+bool wifiWasConnected = false;
+
+void maintainWiFi() {
+    const bool connected = WiFi.status() == WL_CONNECTED;
+    if (connected) {
+        if (!wifiWasConnected) {
+            Serial.printf("[WiFi] Connected; device IP: %s\n", WiFi.localIP().toString().c_str());
+        }
+        wifiWasConnected = true;
+        return;
+    }
+
+    if (wifiWasConnected) Serial.println("[WiFi] Connection lost; retrying in background.");
+    wifiWasConnected = false;
+    if (millis() - lastWiFiAttempt >= WIFI_RETRY_INTERVAL_MS) {
+        lastWiFiAttempt = millis();
+        Serial.printf("[WiFi] Association timed out (status %d); restarting connection.\n", (int)WiFi.status());
+        WiFi.disconnect();
+        WiFi.begin(TRACKSURE_WIFI_SSID, TRACKSURE_WIFI_PASSWORD);
+    }
+}
+#endif
+
+// The LDR is an analogue voltage divider. A torch (especially LED torches)
+// can add ripple and brief ADC spikes, so send a robust median sample followed
+// by a light exponential filter instead of exposing one noisy ADC conversion.
+int readFilteredLdr() {
+    constexpr uint8_t SAMPLE_COUNT = 9;
+    int samples[SAMPLE_COUNT];
+    for (uint8_t i = 0; i < SAMPLE_COUNT; ++i) {
+        samples[i] = analogRead(LDR_PIN);
+        delayMicroseconds(350);
+    }
+    for (uint8_t i = 1; i < SAMPLE_COUNT; ++i) {
+        int value = samples[i];
+        uint8_t j = i;
+        while (j > 0 && samples[j - 1] > value) {
+            samples[j] = samples[j - 1];
+            --j;
+        }
+        samples[j] = value;
+    }
+    const float median = samples[SAMPLE_COUNT / 2];
+    filteredLdrRaw = isnan(filteredLdrRaw) ? median : (filteredLdrRaw * 0.72f + median * 0.28f);
+    return (int)lroundf(filteredLdrRaw);
+}
+
+// Dedicated task keeps Wi-Fi upload/ACK waits out of the sensor loop.
 void relayTask(void*) {
     OutgoingRecord record;
-    String reply;
     for (;;) {
         if (xQueueReceive(outgoing, &record, portMAX_DELAY) != pdTRUE) continue;
         bool acknowledged = false;
         while (!acknowledged) {
-            Serial.print("TRACKSURE ");
-            Serial.println(record.data);
-            unsigned long began = millis();
-            while (millis() - began < 2500) {
-                while (Serial.available()) {
-                    char ch = Serial.read();
-                    if (ch == '\n') {
-                        reply.trim();
-                        if (reply == String("ACK ") + record.id) acknowledged = true;
-                        reply = "";
-                    } else if (reply.length() < 150) reply += ch;
-                    else reply = "";
+#ifdef TRACKSURE_WIFI
+            if (WiFi.status() == WL_CONNECTED) {
+                HTTPClient http;
+                http.setConnectTimeout(1500);
+                http.setTimeout(2000);
+                http.begin(TRACKSURE_GATEWAY_URL);
+                http.addHeader("Content-Type", "application/json");
+                int status = http.POST(String(record.data));
+                if (status == 200) {
+                    StaticJsonDocument<256> ack;
+                    if (!deserializeJson(ack, http.getString()) &&
+                        ack["event_id"].as<String>() == String(record.id) &&
+                        ack["status"].as<String>() == "success") acknowledged = true;
                 }
-                if (acknowledged) break;
-                vTaskDelay(pdMS_TO_TICKS(10));
+                http.end();
+                if (acknowledged) { Serial.println("[WiFi] Gateway acknowledged signed record"); break; }
+                Serial.printf("[WiFi] Gateway POST/ACK failed (%d); retaining event for retry.\n", status);
             }
+#endif
+            // Serial remains available for debugging and flashing, but never
+            // receives telemetry or acknowledgments as a transport channel.
+            vTaskDelay(pdMS_TO_TICKS(250));
         }
     }
 }
@@ -364,8 +433,8 @@ bool sendSensorData(
     doc["boot_id"] = bootId;
     doc["sequence"] = eventSequence;
     doc["uptime_ms"] = millis();
-    doc["firmware_version"] = "tracksure-usb-gateway-2-signed";
-    doc["signature_status"] = "atecc608a-slot-0";
+    doc["firmware_version"] = "tracksure-lan-gateway-3-signed";
+    doc["signature_status"] = ATECC_DEVICE_LABEL;
     doc["temperature_age_ms"] = millis()-lastValidDHT;
     doc["device_id"] = DEVICE_ID;
     doc["shipment_code"] = SHIPMENT_CODE;
@@ -383,12 +452,11 @@ bool sendSensorData(
         doc["humidity"] = round(humidity * 10.0) / 10.0;
     }
 
-    // Convert the inverted LDR reading to the application's LUX value.
-    // No light  (~4095 raw) -> 0 LUX
-    // Light    (~112 raw)  -> 1000 LUX
-    float lightLux = (ldrRaw <= 500) ? 1000.0 : 0.0;
+    // This is an ADC measurement, not a calibrated lux sensor.  With the
+    // specified divider, darkness is near 4095 and bright light is near 0.
+    float lightLux = 1000.0f * (4095.0f - constrain((float)ldrRaw, 0.0f, 4095.0f)) / 4095.0f;
     doc["light_lux"] = lightLux;
-    doc["light_measurement_kind"] = "binary_exposure_proxy";
+    doc["light_measurement_kind"] = "raw_adc_brightness_proxy";
     doc["ldr_raw"] = ldrRaw;
 
     doc["mpu_available"] = mpuAvailable;
@@ -449,10 +517,15 @@ bool sendSensorData(
     mbedtls_sha256_free(&sha);
 
     uint8_t signature[64];
-    if (!ECCX08.ecSign(ATECC_KEY_SLOT, digest, signature)) {
+    bool signedOk = false;
+    for (uint8_t attempt = 0; attempt < 2 && !signedOk; ++attempt) {
+        signedOk = ECCX08.ecSign(ATECC_KEY_SLOT, digest, signature);
+        if (!signedOk) delay(20);
+    }
+    if (!signedOk) {
         ateccAvailable = false;
         Wire.setClock(I2C_CLOCK_HZ);
-        Serial.println("[ATECC] Slot 0 signing failed; telemetry not queued.");
+        Serial.println("[ATECC] Slot 0 signing failed after retry; telemetry not queued.");
         return false;
     }
     // ArduinoECCX08 raises non-AVR I2C to 1 MHz internally. Restore the
@@ -483,7 +556,10 @@ bool sendSensorData(
     if (requestBody.length() >= sizeof(record.data)) return false;
     requestBody.toCharArray(record.data, sizeof(record.data));
     String(doc["event_id"].as<const char*>()).toCharArray(record.id, sizeof(record.id));
-    if (xQueueSend(outgoing, &record, 0) != pdTRUE) return false;
+    if (xQueueSend(outgoing, &record, 0) != pdTRUE) {
+        Serial.println("[Transport] Queue full; retaining sequence number for retry.");
+        return false;
+    }
     eventSequence++;
     return true;
 }
@@ -502,10 +578,18 @@ void setup()
     delay(300);
     Serial.println("TRACKSURE_BOOT");
 
+#ifdef TRACKSURE_WIFI
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(TRACKSURE_WIFI_SSID, TRACKSURE_WIFI_PASSWORD);
+    lastWiFiAttempt = millis();
+    Serial.println("[WiFi] Connection started; sensor initialization continues.");
+#endif
+
     Serial.println();
     Serial.println("========================================");
     Serial.println(" SafeTrack ESP32-S3 Sensor Node");
-    Serial.println(" DHT11 + LDR + MPU6050 + USB laptop relay");
+    Serial.println(" DHT11 + LDR + MPU6050 + Wi-Fi laptop gateway");
     Serial.println(" Direct MPU6050 I2C / XY Shock Mode");
     Serial.println("========================================");
 
@@ -543,8 +627,8 @@ void setup()
     snprintf(bootId, sizeof(bootId), "%08lx%08lx", (unsigned long)esp_random(), (unsigned long)esp_random());
     outgoing = xQueueCreate(32, sizeof(OutgoingRecord));
     if (!outgoing) { Serial.println("QUEUE ALLOCATION FAILED"); while(true) delay(1000); }
-    xTaskCreate(relayTask, "USB relay", 6144, nullptr, 1, nullptr);
-    Serial.println("USB gateway ready. Run gateway/start-gateway.cmd; close Serial Monitor.");
+    xTaskCreate(relayTask, "gateway relay", 6144, nullptr, 1, nullptr);
+    Serial.println("Wi-Fi gateway relay ready. USB Serial is debug/flash only.");
 }
 
 // =====================================================
@@ -553,8 +637,11 @@ void setup()
 
 void loop()
 {
+#ifdef TRACKSURE_WIFI
+    maintainWiFi();
+#endif
 
-    // The USB serial connection can reset the ESP while the secure element is
+    // A serial debug connection can reset the ESP while the secure element is
     // still waking. Retry enrollment locally instead of remaining unsigned.
     if (!ateccAvailable && millis() - lastAteccRetryTime >= ATECC_RETRY_INTERVAL_MS)
     {
@@ -617,7 +704,7 @@ void loop()
     // C. Read LDR
     // -------------------------------------------------
 
-    int ldrRaw = analogRead(LDR_PIN);
+    int ldrRaw = readFilteredLdr();
 
     // -------------------------------------------------
     // D. Read MPU6050
@@ -631,9 +718,10 @@ void loop()
     float gz = 0.0;
 
     bool mpuReadOk = readMPU6050(ax, ay, az, gx, gy, gz);
-
-    if (mpuAvailable && !mpuReadOk)
-    {
+    if (mpuReadOk) {
+        mpuReadFailures = 0;
+    } else if (mpuAvailable && ++mpuReadFailures >= MPU_FAILURES_BEFORE_REINIT) {
+        mpuReadFailures = 0;
         mpuAvailable = false; // enables the existing retry branch
     }
 

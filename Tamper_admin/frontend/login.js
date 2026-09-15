@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://safetrack-admin-c243.onrender.com/api";
+const API_BASE_URL = "https://safetrack-api-live.vercel.app/api";
 const USER_DASHBOARD = "https://safetrack-user-live-chi.vercel.app/";
 
 document.addEventListener("DOMContentLoaded", () => {

@@ -18,6 +18,7 @@ let adminPackageRenderer = null;
 let adminPackageMesh = null;
 let adminPackageControls = null;
 let adminTargetPitch = 0;
+let adminOrientationQ = null;
 let adminTargetRoll = 0;
 let adminCurrentPitch = 0;
 let adminCurrentRoll = 0;
@@ -297,17 +298,21 @@ function filterShipmentsData() {
 async function inspectShipment(code, silent = false) {
     try {
         currentlyInspectedCode = code;
-        const details = await SafeTrackAPI.getShipmentByCode(code);
+        const details = silent
+            ? await SafeTrackAPI.getShipmentLive(code)
+            : await SafeTrackAPI.getShipmentByCode(code);
         if (!details) return;
 
         if (silent) {
             updateAdminOrientation(details.latest_telemetry || null);
+            updateAdminLiveFields(details);
             return;
         }
         renderShipmentInspector(details);
 
         if (!silent) {
             openModal("inspectShipmentModal");
+            document.getElementById("inspect-event-count")?.scrollIntoView({ block: "start" });
             startInspectionAutoRefresh(code);
         }
 
@@ -316,6 +321,22 @@ async function inspectShipment(code, silent = false) {
         console.error("Shipment inspection failed:", err);
         if (!silent) showToast("Error retrieving shipment details", "error");
     }
+}
+
+function updateAdminLiveFields(details) {
+    const latest = details.latest_telemetry || null;
+    if (!latest) return;
+    const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+    set("inspect-last-update", formatDateTime(latest.created_at));
+    set("inspect-pitch", `${number(latest.pitch, 1)}°`);
+    set("inspect-roll", `${number(latest.roll, 1)}°`);
+    set("inspect-accel", `${number(latest.accel_g, 2)} g`);
+    set("inspect-gyro", `${number(latest.gyro_dps, 1)} °/s`);
+    set("inspect-temperature", `${number(latest.temperature, 1)} °C`);
+    set("inspect-humidity", `${number(latest.humidity, 1)} %`);
+    set("inspect-light", `${number(latest.light_lux, 1)} LUX`);
+    set("inspect-acceleration", `${number(latest.accel_g, 2)} g`);
+    if (Array.isArray(details.events)) set("inspect-event-count", `${details.events.length} EVENTS`);
 }
 
 function renderShipmentInspector(details) {
@@ -428,7 +449,7 @@ function renderShipmentInspector(details) {
             <div class="flex items-center justify-between gap-3">
                 <div class="min-w-0">
                     <h4 class="font-bold text-sm text-slate-900 dark:text-white truncate">${esc(s.title)}</h4>
-                    <p class="text-[10px] text-slate-400 mt-0.5">Last backend update: ${latest ? esc(formatDateTime(latest.created_at)) : "No telemetry yet"}</p>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Last backend update: <span id="inspect-last-update">${latest ? esc(formatDateTime(latest.created_at)) : "No telemetry yet"}</span></p>
                 </div>
                 <span class="badge ${statusBadgeClass(s.status)} shrink-0">${esc(s.status || "Unknown")}</span>
             </div>
@@ -506,11 +527,11 @@ function renderShipmentInspector(details) {
                     <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30 space-y-1.5 text-[11px]">
                         <div class="flex items-center justify-between">
                             <span class="text-slate-500 dark:text-slate-400">Accel Vector (accel_g):</span>
-                            <strong class="font-mono text-slate-800 dark:text-slate-200">${latestAccel} g</strong>
+                            <strong id="inspect-accel" class="font-mono text-slate-800 dark:text-slate-200">${latestAccel} g</strong>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-slate-500 dark:text-slate-400">Gyro Velocity (gyro_dps):</span>
-                            <strong class="font-mono text-slate-800 dark:text-slate-200">${latestGyro} °/s</strong>
+                            <strong id="inspect-gyro" class="font-mono text-slate-800 dark:text-slate-200">${latestGyro} °/s</strong>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-slate-500 dark:text-slate-400">Record Hash:</span>
@@ -529,19 +550,19 @@ function renderShipmentInspector(details) {
         <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
             <div class="p-3 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20">
                 <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Temperature</p>
-                <p class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestTemp} <span class="text-xs font-medium">°C</span></p>
+                <p id="inspect-temperature" class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestTemp} <span class="text-xs font-medium">°C</span></p>
             </div>
             <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Humidity</p>
-                <p class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestHumidity} <span class="text-xs font-medium">%</span></p>
+                <p id="inspect-humidity" class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestHumidity} <span class="text-xs font-medium">%</span></p>
             </div>
             <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Light</p>
-                <p class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestLight} <span class="text-xs font-medium">LUX</span></p>
+                <p id="inspect-light" class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestLight} <span class="text-xs font-medium">LUX</span></p>
             </div>
             <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Acceleration</p>
-                <p class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestAccel} <span class="text-xs font-medium">g</span></p>
+                <p id="inspect-acceleration" class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestAccel} <span class="text-xs font-medium">g</span></p>
             </div>
         </div>
 
@@ -555,7 +576,7 @@ function renderShipmentInspector(details) {
                     </div>
                     <p class="text-[10px] text-slate-400 mt-0.5">Latest ${events.length} cryptographic records for shipment ${esc(s.id || s.code)}</p>
                 </div>
-                <span class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-300">${events.length} EVENTS</span>
+                <span id="inspect-event-count" class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-300">${events.length} EVENTS</span>
             </div>
             <div class="max-h-64 overflow-auto">
                 <table class="w-full text-left text-[11px]">
@@ -613,7 +634,18 @@ function startInspectionAutoRefresh(code) {
 }
 
 function updateAdminOrientation(latest) {
-    if (!latest) return;
+    if (!latest || latest.mpu_read_ok === false) return;
+    const q=latest.orientation_q;
+    if (Array.isArray(q) && q.length===4 && q.every(Number.isFinite)) {
+        // Sensor Z-up to Three.js Y-up: (x,y,z) -> (x,z,-y).
+        adminOrientationQ = new THREE.Quaternion(q[1],q[3],-q[2],q[0]).normalize();
+    } else {
+        // MPU6050 has no magnetometer.  Do not integrate its noisy gyro while
+        // stationary: gravity-based pitch/roll is stable and still reflects
+        // real 90/180 degree parcel tilts.
+        adminOrientationQ = null;
+    }
+    if (latest.accel_x == null || latest.accel_y == null || latest.accel_z == null) return;
     const ax = Number(latest.accel_x);
     const ay = Number(latest.accel_y);
     const az = Number(latest.accel_z);
@@ -876,13 +908,16 @@ function animateAdminPackageScene() {
 
     // Physical orientation driven by real sensor telemetry (smooth lerp, no artificial endless rotation)
     if (adminPackageMesh) {
+        const previousOrientation = adminPackageMesh.quaternion.clone();
         const lerpSpeed = 0.22;
-        adminCurrentPitch += (adminTargetPitch - adminCurrentPitch) * lerpSpeed;
-        adminCurrentRoll += (adminTargetRoll - adminCurrentRoll) * lerpSpeed;
+        const angleDelta = (target, current) => ((target - current + 180) % 360 + 360) % 360 - 180;
+        adminCurrentPitch += angleDelta(adminTargetPitch, adminCurrentPitch) * lerpSpeed;
+        adminCurrentRoll += angleDelta(adminTargetRoll, adminCurrentRoll) * lerpSpeed;
 
         adminPackageMesh.rotation.x = THREE.MathUtils.degToRad(adminCurrentPitch);
         adminPackageMesh.rotation.z = THREE.MathUtils.degToRad(adminCurrentRoll);
         adminPackageMesh.rotation.y = 0;
+        if (adminOrientationQ) adminPackageMesh.quaternion.copy(previousOrientation).slerp(adminOrientationQ, 0.08);
     }
 
     if (adminPackageRenderer && adminPackageScene && adminPackageCamera) {

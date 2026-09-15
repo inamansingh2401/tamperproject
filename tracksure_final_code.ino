@@ -57,9 +57,8 @@ const char* WAREHOUSE_LOCATION = "Rewari Transit Hub, HR";
 #define SHOCK_COOLDOWN_MS 1000
 
 const unsigned long DHT_INTERVAL_MS = 2000;
-// A 500 ms signed sample keeps the remote orientation display responsive while
-// the DHT is still read at its safe 2 second cadence.
-const unsigned long SEND_INTERVAL_MS = 500;
+// A 1 second signed sample limits cloud backlog while remaining responsive.
+const unsigned long SEND_INTERVAL_MS = 1000;
 const unsigned long WIFI_RETRY_INTERVAL_MS = 10000;
 const unsigned long MPU_RETRY_INTERVAL_MS = 15000;
 const unsigned long ATECC_RETRY_INTERVAL_MS = 3000;
@@ -91,6 +90,8 @@ unsigned long lastSendTime = 0;
 unsigned long lastWiFiAttempt = 0;
 unsigned long lastMpuRetryTime = 0;
 unsigned long lastAteccRetryTime = 0;
+uint8_t mpuReadFailures = 0;
+const uint8_t MPU_FAILURES_BEFORE_REINIT = 3;
 
 // Horizontal baseline. Z is not used.
 float baselineAx = 0.0;
@@ -449,10 +450,15 @@ bool sendSensorData(
     mbedtls_sha256_free(&sha);
 
     uint8_t signature[64];
-    if (!ECCX08.ecSign(ATECC_KEY_SLOT, digest, signature)) {
+    bool signedOk = false;
+    for (uint8_t attempt = 0; attempt < 2 && !signedOk; ++attempt) {
+        signedOk = ECCX08.ecSign(ATECC_KEY_SLOT, digest, signature);
+        if (!signedOk) delay(20);
+    }
+    if (!signedOk) {
         ateccAvailable = false;
         Wire.setClock(I2C_CLOCK_HZ);
-        Serial.println("[ATECC] Slot 0 signing failed; telemetry not queued.");
+        Serial.println("[ATECC] Slot 0 signing failed after retry; telemetry not queued.");
         return false;
     }
     // ArduinoECCX08 raises non-AVR I2C to 1 MHz internally. Restore the
@@ -632,8 +638,10 @@ void loop()
 
     bool mpuReadOk = readMPU6050(ax, ay, az, gx, gy, gz);
 
-    if (mpuAvailable && !mpuReadOk)
-    {
+    if (mpuReadOk) {
+        mpuReadFailures = 0;
+    } else if (mpuAvailable && ++mpuReadFailures >= MPU_FAILURES_BEFORE_REINIT) {
+        mpuReadFailures = 0;
         mpuAvailable = false; // enables the existing retry branch
     }
 

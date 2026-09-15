@@ -58,6 +58,8 @@ def ensure_schema_migrations():
         existing_cols = {column["name"] for column in inspect(engine).get_columns("sensor_events")}
         with engine.begin() as conn:
             new_cols = {
+                "orientation_q": "TEXT",
+                "mpu_read_ok": "BOOLEAN",
                 "event_id": "VARCHAR(128)",
                 "accel_x": "FLOAT DEFAULT 0.0",
                 "accel_y": "FLOAT DEFAULT 0.0",
@@ -107,6 +109,10 @@ def normalize_legacy_vehicle_ids(db: Session):
 def startup_db_seed():
     db = SessionLocal()
     try:
+        # Serverless platforms may cold-start several workers together. Serialize
+        # first-run seeding so two instances cannot insert the same unique rows.
+        if engine.dialect.name == "postgresql":
+            db.execute(text("SELECT pg_advisory_xact_lock(72432026)"))
         normalize_legacy_vehicle_ids(db)
         db.commit()
 
@@ -235,6 +241,16 @@ class UserCreatePayload(BaseModel):
 
 
 class GPSSensorIngestPayload(BaseModel):
+    orientation_q: Optional[List[float]] = Field(default=None, min_length=4, max_length=4)
+
+    @field_validator('orientation_q')
+    @classmethod
+    def valid_orientation(cls, value):
+        if value is not None:
+            norm = sum(v*v for v in value)
+            if not all(math.isfinite(v) for v in value) or not 0.9 < norm < 1.1:
+                raise ValueError('Orientation must be a unit quaternion')
+        return value
     model_config = ConfigDict(extra="allow", allow_inf_nan=False, str_max_length=512)
     event_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
     device_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")
@@ -660,15 +676,18 @@ def get_shipment_by_code(
             "light_unit": "LUX",
             "accel_g": float(event.accel_g or 0),
             "gyro_dps": float(event.gyro_dps or 0),
-            "accel_x": float(getattr(event, "accel_x", 0.0) if getattr(event, "accel_x", None) is not None else 0.0),
-            "accel_y": float(getattr(event, "accel_y", 0.0) if getattr(event, "accel_y", None) is not None else 0.0),
-            "accel_z": float(getattr(event, "accel_z", 1.0) if getattr(event, "accel_z", None) is not None else 1.0),
-            "gyro_x": float(getattr(event, "gyro_x", 0.0) if getattr(event, "gyro_x", None) is not None else 0.0),
-            "gyro_y": float(getattr(event, "gyro_y", 0.0) if getattr(event, "gyro_y", None) is not None else 0.0),
-            "gyro_z": float(getattr(event, "gyro_z", 0.0) if getattr(event, "gyro_z", None) is not None else 0.0),
+            "accel_x": float(event.accel_x) if event.accel_x is not None and event.mpu_read_ok is not False else None,
+            "accel_y": float(event.accel_y) if event.accel_y is not None and event.mpu_read_ok is not False else None,
+            "accel_z": float(event.accel_z) if event.accel_z is not None and event.mpu_read_ok is not False else None,
+            "gyro_x": float(event.gyro_x) if event.gyro_x is not None and event.mpu_read_ok is not False else None,
+            "gyro_y": float(event.gyro_y) if event.gyro_y is not None and event.mpu_read_ok is not False else None,
+            "gyro_z": float(event.gyro_z) if event.gyro_z is not None and event.mpu_read_ok is not False else None,
             "shock_g": float(getattr(event, "shock_g", 0.0) if getattr(event, "shock_g", None) is not None else 0.0),
-            "pitch": float(getattr(event, "pitch", 0.0) if getattr(event, "pitch", None) is not None else 0.0),
-            "roll": float(getattr(event, "roll", 0.0) if getattr(event, "roll", None) is not None else 0.0),
+            "orientation_q": json.loads(event.orientation_q) if event.orientation_q else None,
+            "mpu_read_ok": event.mpu_read_ok,
+            "event_id": event.event_id,
+            "pitch": float(event.pitch) if event.pitch is not None and event.mpu_read_ok is not False else None,
+            "roll": float(event.roll) if event.roll is not None and event.mpu_read_ok is not False else None,
             "health_level": event.health_level or "Optimal",
             "previous_hash": event.previous_hash,
             "record_hash": event.record_hash,
@@ -719,6 +738,73 @@ def get_shipment_by_code(
         "latest_telemetry": latest,
         "events": events_data,
         "alerts": alerts_data
+    }
+
+
+@app.get("/api/shipments/{code}/live")
+def get_shipment_live(
+    code: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return one fresh reading for dashboard polling without rebuilding the ledger."""
+    shipment = db.query(Shipment).filter(Shipment.shipment_code == code).first()
+    if not shipment:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    if current_user.role != "admin":
+        try:
+            assigned_shipments = json.loads(current_user.assigned_vehicles or "[]")
+        except (TypeError, json.JSONDecodeError):
+            assigned_shipments = []
+        if code not in assigned_shipments:
+            raise HTTPException(status_code=403, detail="Shipment not assigned to this user")
+
+    event = (
+        db.query(SensorEvent)
+        .filter(SensorEvent.shipment_id == shipment.id)
+        .order_by(SensorEvent.id.desc())
+        .first()
+    )
+    latest = None
+    if event:
+        latest = {
+            "id": event.id,
+            "event_id": event.event_id,
+            "device_id": event.device_id,
+            "temperature": float(event.temperature) if event.temperature is not None else None,
+            "humidity": float(event.humidity) if event.humidity is not None else None,
+            "light_lux": float(event.light_lux) if event.light_lux is not None else None,
+            "accel_g": float(event.accel_g) if event.accel_g is not None else None,
+            "gyro_dps": float(event.gyro_dps) if event.gyro_dps is not None else None,
+            "shock_g": float(event.shock_g) if event.shock_g is not None else None,
+            "accel_x": float(event.accel_x) if event.accel_x is not None and event.mpu_read_ok is not False else None,
+            "accel_y": float(event.accel_y) if event.accel_y is not None and event.mpu_read_ok is not False else None,
+            "accel_z": float(event.accel_z) if event.accel_z is not None and event.mpu_read_ok is not False else None,
+            "gyro_x": float(event.gyro_x) if event.gyro_x is not None and event.mpu_read_ok is not False else None,
+            "gyro_y": float(event.gyro_y) if event.gyro_y is not None and event.mpu_read_ok is not False else None,
+            "gyro_z": float(event.gyro_z) if event.gyro_z is not None and event.mpu_read_ok is not False else None,
+            "orientation_q": json.loads(event.orientation_q) if event.orientation_q else None,
+            "mpu_read_ok": event.mpu_read_ok,
+            "pitch": float(event.pitch) if event.pitch is not None and event.mpu_read_ok is not False else None,
+            "roll": float(event.roll) if event.roll is not None and event.mpu_read_ok is not False else None,
+            "created_at": event.created_at.isoformat() if event.created_at else None,
+        }
+    return {
+        "shipment": {
+            "id": shipment.shipment_code,
+            "code": shipment.shipment_code,
+            "title": shipment.title,
+            "vehicle_id": shipment.vehicle_id,
+            "sender": shipment.sender,
+            "recipient": shipment.recipient_name,
+            "origin": shipment.origin,
+            "destination": shipment.destination,
+            "current_warehouse": shipment.current_warehouse,
+            "status": shipment.status,
+            "seal_status": shipment.seal_status,
+            "health_level": shipment.health_level,
+        },
+        "latest_telemetry": latest,
     }
 
 
@@ -1099,9 +1185,9 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
         pitch_deg = round(math.atan2(ay, math.sqrt(ax**2 + az**2)) * 180.0 / math.pi, 2)
         roll_deg = round(math.atan2(-ax, denom) * 180.0 / math.pi, 2)
     else:
-        deviation = effective_accel - 1.0
-        pitch_deg = round(max(-45.0, min(45.0, deviation * 28.0)), 2)
-        roll_deg = round(max(-45.0, min(45.0, effective_gyro * 0.5)), 2)
+        # A missing vector cannot determine orientation.
+        pitch_deg = None
+        roll_deg = None
 
     is_shock = (data.shock_detected is True) or (effective_accel >= 3.0)
 
@@ -1200,6 +1286,8 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
     curr_hash = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
 
     event = SensorEvent(
+        orientation_q=json.dumps(data.orientation_q) if data.orientation_q and data.mpu_read_ok is not False else None,
+        mpu_read_ok=data.mpu_read_ok,
         event_id=data.event_id,
         shipment_id=shipment.id,
         device_id=data.device_id,

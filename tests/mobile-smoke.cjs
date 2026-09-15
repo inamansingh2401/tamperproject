@@ -7,9 +7,9 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const out = path.join(root, 'artifacts');
 fs.mkdirSync(out, {recursive: true});
-const api = process.env.TEST_API_URL || 'https://safetrack-admin-c243.onrender.com';
-const adminBase = process.env.TEST_ADMIN_URL || 'http://127.0.0.1:5511/Tamper_admin_SIH/frontend/';
-const userBase = process.env.TEST_USER_URL || 'http://127.0.0.1:5511/Tamper_user_SIH/frontend/';
+const api = process.env.TEST_API_URL || 'https://safetrack-api-live.vercel.app';
+const adminBase = process.env.TEST_ADMIN_URL || 'http://127.0.0.1:5511/Tamper_admin/frontend/';
+const userBase = process.env.TEST_USER_URL || 'http://127.0.0.1:5511/Tamper_user/frontend/';
 async function login(username, password) {
   assert(password, 'Supply test passwords through environment variables');
   const response = await fetch(api + '/api/auth/login', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({username,password})});

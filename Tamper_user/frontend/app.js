@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://safetrack-admin-c243.onrender.com";
+const API_BASE_URL = "https://safetrack-api-live.vercel.app";
 const TOKEN_KEY = "safetrack_access_token";
 const ROLE_KEY = "safetrack_role";
 const USER_KEY = "safetrack_username";
@@ -10,6 +10,7 @@ let assignedShipments = [];
 let refreshTimer = null;
 let fetchingReadings = false;
 let temperatureChart = null;
+let sensorOrientationQ = null;
 let motionChart = null;
 
 // 3D Package Orientation System (MPU6050)
@@ -66,7 +67,7 @@ function restoreSession() {
   currentShipmentCode = assignedShipments[0] || null;
   showApp(username);
   populateShipmentSelector();
-  if (currentShipmentCode) fetchShipmentData();
+  if (currentShipmentCode) fetchShipmentData(true);
   startRefresh();
 }
 
@@ -105,7 +106,7 @@ async function handleLogin(event) {
 
     showApp(data.username || username);
     populateShipmentSelector();
-    if (currentShipmentCode) await fetchShipmentData();
+    if (currentShipmentCode) await fetchShipmentData(true);
     startRefresh();
     showToast("Welcome back", "Your shipment portal is ready.", "success");
   } catch (error) {
@@ -161,18 +162,21 @@ function populateShipmentSelector() {
 function selectShipment(code) {
   if (!assignedShipments.includes(code)) return;
   currentShipmentCode = code;
-  fetchShipmentData();
+  fetchShipmentData(true);
   openTab("overview");
 }
 
-async function fetchShipmentData() {
+async function fetchShipmentData(includeHistory = false) {
   if (!authToken || !currentShipmentCode || fetchingReadings) return;
   fetchingReadings = true;
   const requestedCode = currentShipmentCode;
 
   try {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/api/shipments/${encodeURIComponent(currentShipmentCode)}`, {
-      headers: { Authorization: `Bearer ${authToken}` }
+    const endpoint = includeHistory
+      ? `/api/shipments/${encodeURIComponent(currentShipmentCode)}`
+      : `/api/shipments/${encodeURIComponent(currentShipmentCode)}/live`;
+    const response = await fetchWithTimeout(`${API_BASE_URL}${endpoint}`, {
+      headers: { Authorization: `Bearer ${authToken}`, "Cache-Control": "no-cache" }
     });
 
     if (response.status === 401 || response.status === 403) {
@@ -186,9 +190,11 @@ async function fetchShipmentData() {
     renderShipment(data.shipment || {});
     renderEnvironment(data.latest_telemetry || (data.events || [])[0] || null, data.shipment || {});
     renderPackageOrientation(data.latest_telemetry || (data.events || [])[0] || null);
-    renderCharts(Array.isArray(data.events) ? data.events : []);
-    renderAlerts(Array.isArray(data.alerts) ? data.alerts : []);
-    renderHistory(Array.isArray(data.events) ? data.events : []);
+    if (includeHistory) {
+      renderCharts(Array.isArray(data.events) ? data.events : []);
+      renderAlerts(Array.isArray(data.alerts) ? data.alerts : []);
+      renderHistory(Array.isArray(data.events) ? data.events : []);
+    }
     const reading = data.latest_telemetry || (data.events || [])[0];
     const receipt = reading?.created_at ? parseCloudDate(reading.created_at) : null;
     const recent = receipt && Number.isFinite(receipt.getTime()) && Date.now() - receipt.getTime() < 20000;
@@ -747,6 +753,10 @@ function resetPackageCamera() {
 
 function renderPackageOrientation(telemetry) {
   if (!telemetry) return;
+  if (telemetry.mpu_read_ok === false) {
+    if ($("orientationText")) $("orientationText").textContent = "Sensor unavailable — holding last orientation";
+    return;
+  }
 
   const accel = Number(telemetry.accel_g);
   const gyro = Number(telemetry.gyro_dps);
@@ -763,6 +773,12 @@ function renderPackageOrientation(telemetry) {
   const ay = Number(telemetry.accel_y);
   const az = Number(telemetry.accel_z);
   const suppliedPitch = Number(telemetry.pitch);
+  const q = telemetry.orientation_q;
+  if (Array.isArray(q) && q.length===4 && q.every(Number.isFinite)) {
+    sensorOrientationQ = new THREE.Quaternion(q[1],q[3],-q[2],q[0]).normalize();
+  } else {
+    sensorOrientationQ = null;
+  }
   const suppliedRoll = Number(telemetry.roll);
   if (Number.isFinite(suppliedPitch) && Number.isFinite(suppliedRoll)) {
     targetPitchDeg = suppliedPitch;
@@ -833,6 +849,7 @@ function animatePackageScene() {
   // Smoothly interpolate physical orientation to target angles (NO fake continuous rotation)
   // Package remains completely stable when sensor is stable
   if (packageMesh) {
+        const previousOrientation = packageMesh.quaternion.clone();
     const lerpSpeed = 0.22;
     currentPitchDeg += (targetPitchDeg - currentPitchDeg) * lerpSpeed;
     currentRollDeg += (targetRollDeg - currentRollDeg) * lerpSpeed;
@@ -841,6 +858,7 @@ function animatePackageScene() {
     packageMesh.rotation.x = THREE.MathUtils.degToRad(currentPitchDeg);
     packageMesh.rotation.z = THREE.MathUtils.degToRad(currentRollDeg);
     packageMesh.rotation.y = 0; // Yaw is held stable unless physical rotation
+    if (sensorOrientationQ) packageMesh.quaternion.copy(previousOrientation).slerp(sensorOrientationQ, 0.45);
   }
 
   if (packageRenderer && packageScene && packageCamera) {

@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 import uuid
 
-API_URL = os.getenv("SAFETRACK_API_URL", "https://safetrack-admin-c243.onrender.com/api/events")
+API_URL = os.getenv("SAFETRACK_API_URL", "https://safetrack-api-live.vercel.app/api/events")
 DEVICE_KEY = os.getenv("DEVICE_API_KEY", "").strip()
 if not DEVICE_KEY:
     private_config = Path(__file__).resolve().parents[2] / "gateway" / "gateway.local.json"

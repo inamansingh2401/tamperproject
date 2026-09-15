@@ -1,4 +1,4 @@
-"""TrackSure USB gateway: serial -> durable outbox -> existing HTTPS API."""
+"""TrackSure Wi-Fi/LAN gateway: signed device records -> durable outbox -> HTTPS API."""
 import argparse
 import base64
 import hashlib
@@ -8,13 +8,12 @@ import math
 import sqlite3
 import threading
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import httpx
-import serial
-from serial.tools import list_ports
 
 LOG = logging.getLogger('tracksure')
 ROOT = Path(__file__).resolve().parent
@@ -96,11 +95,16 @@ class Outbox:
             db.execute('PRAGMA journal_mode=WAL')
             db.execute('CREATE TABLE IF NOT EXISTS outbox (event_id TEXT PRIMARY KEY, digest TEXT NOT NULL, payload TEXT NOT NULL, original TEXT NOT NULL, verified INTEGER NOT NULL, state TEXT NOT NULL DEFAULT \'queued\', attempts INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL DEFAULT 0, error TEXT, received TEXT NOT NULL, sent TEXT)')
 
+    @contextmanager
     def connect(self):
         db = sqlite3.connect(self.path, timeout=10)
         db.row_factory = sqlite3.Row
         db.execute('PRAGMA synchronous=FULL')
-        return db
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
     def enqueue(self, event_id, payload, verified, original):
         body = json.dumps(payload, sort_keys=True, separators=(',', ':'), allow_nan=False)
@@ -117,7 +121,19 @@ class Outbox:
 
     def pending(self):
         with self.connect() as db:
-            return db.execute("SELECT * FROM outbox WHERE state='queued' AND next_attempt<=? ORDER BY rowid LIMIT 1", (time.time(),)).fetchone()
+            # Lease atomically: parallel uploaders must never select the same row.
+            db.execute('BEGIN IMMEDIATE')
+            now = time.time()
+            row = db.execute("SELECT rowid AS ordinal,* FROM outbox WHERE state='queued' ORDER BY rowid DESC LIMIT 1").fetchone()
+            if row and row['next_attempt'] > now:
+                return None
+            if row:
+                # Preserve exact signed history locally, but never replay stale
+                # samples over the current cloud display. This gateway is enrolled
+                # to one device/shipment (validated by decode_record).
+                db.execute("UPDATE outbox SET state='archived',error='Superseded for live delivery; signed original retained locally' WHERE state='queued' AND rowid<?", (row['ordinal'],))
+                db.execute('UPDATE outbox SET next_attempt=? WHERE event_id=?', (now + 120, row['event_id']))
+            return row
 
     def mark(self, event_id, state, error=None, delay=0):
         with self.connect() as db:
@@ -156,70 +172,86 @@ def send_one(outbox, config, client):
 
 
 def upload_loop(outbox, config):
-    with httpx.Client(timeout=httpx.Timeout(65, connect=15), verify=True, follow_redirects=False) as client:
-        while not STOP.is_set():
-            if not send_one(outbox, config, client):
-                STOP.wait(1)
+    # Multiple workers let the durable outbox catch up when API/database
+    # latency is higher than the ESP sampling interval. Every row is still
+    # retained and acknowledged independently, so no telemetry is discarded.
+    def worker():
+        with httpx.Client(timeout=httpx.Timeout(65, connect=15), verify=True, follow_redirects=False) as client:
+            while not STOP.is_set():
+                if not send_one(outbox, config, client):
+                    STOP.wait(0.25)
 
-
-def choose_port(requested):
-    if requested != 'auto':
-        return requested
-    candidates = [p for p in list_ports.comports() if p.vid in (0x303A,0x10C4,0x1A86,0x0403)]
-    return candidates[0].device if len(candidates) == 1 else None
-
-
-def serial_loop(outbox, config, port):
+    # One in-flight request preserves cloud ordering and the per-shipment chain.
+    workers = [threading.Thread(target=worker, name='cloud-live-upload', daemon=True)]
+    for thread in workers:
+        thread.start()
     while not STOP.is_set():
-        selected = choose_port(port)
-        if not selected:
-            STOP.wait(3)
-            continue
-        try:
-            with serial.Serial(selected, 115200, timeout=1, write_timeout=2) as connection:
-                # ESP32-S3 native USB uses these control lines for reset/boot.
-                # PySerial asserts both by default on some Windows drivers, which
-                # can leave the board in reset or ROM download mode.
-                connection.setDTR(False)
-                connection.setRTS(False)
-                time.sleep(0.25)
-                LOG.info('ESP32 connected on %s', selected)
-                while not STOP.is_set():
-                    line = connection.read_until(b'\n', 16385).strip()
-                    if not line.startswith(b'TRACKSURE '):
-                        continue
-                    try:
-                        event_id, payload, verified, original = decode_record(line, config)
-                        inserted = outbox.enqueue(event_id, payload, verified, original)
-                        # ACK means laptop disk commit, not cloud receipt.
-                        connection.write(('ACK '+event_id+'\n').encode())
-                        if inserted:
-                            LOG.info('Received %.1f C, %.1f%% RH; %s', payload['temperature'], payload['humidity'], event_id)
-                    except Exception as exc:
-                        LOG.warning('Record rejected: %s', type(exc).__name__ + ': ' + str(exc)[:160])
-        except (serial.SerialException, OSError):
-            LOG.warning('USB disconnected/busy; reconnecting. Close Arduino Serial Monitor.')
-            STOP.wait(3)
+        STOP.wait(1)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default=str(ROOT/'gateway.local.json'))
-    parser.add_argument('--port', default='auto')
-    parser.add_argument('--status-port', type=int, default=8765)
+    parser.add_argument('--status-port', type=int, default=None)
+    parser.add_argument('--bind', default=None, help='Listener address; defaults to lan_bind in local config')
+    parser.add_argument('--outbox', default=str(ROOT/'gateway-outbox.db'))
+    parser.add_argument('--local-only', action='store_true', help='Accept and persist device records without cloud upload')
+    parser.add_argument('--max-wifi-ingest', type=int, default=None, help='Stop after this many successful Wi-Fi requests')
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text(encoding='utf-8-sig'))
+    bind = args.bind or config.get('lan_bind', '127.0.0.1')
+    status_port = args.status_port or int(config.get('lan_port', 8765))
     if not config['cloud_url'].startswith('https://'):
         raise SystemExit('Cloud URL must use HTTPS')
+    if args.max_wifi_ingest is not None and args.max_wifi_ingest < 1:
+        raise SystemExit('--max-wifi-ingest must be at least 1')
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-    outbox = Outbox(ROOT/'gateway-outbox.db')
+    outbox = Outbox(Path(args.outbox))
+    local_status_clients = {'127.0.0.1', '::1'}
+    if bind not in ('0.0.0.0', '::'):
+        local_status_clients.add(bind)
+    accepted_wifi_requests = 0
     class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            nonlocal accepted_wifi_requests
+            if self.path != '/ingest':
+                self.send_error(404)
+                return
+            self.connection.settimeout(5)
+            try:
+                size = int(self.headers.get('Content-Length', '0'))
+                if not 0 < size <= 16384:
+                    self.send_error(413)
+                    return
+                raw = self.rfile.read(size)
+                if len(raw) != size:
+                    raise ValueError('Incomplete record')
+                secure_config = dict(config, require_signature=True)
+                event_id, payload, verified, original = decode_record(raw, secure_config)
+                inserted = outbox.enqueue(event_id, payload, verified, original)
+                body = json.dumps({'status': 'success', 'event_id': event_id}).encode()
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                LOG.info('Wi-Fi %s verified record %s from %s',
+                         'received' if inserted else 're-acknowledged', event_id, self.client_address[0])
+                accepted_wifi_requests += 1
+                if args.max_wifi_ingest and accepted_wifi_requests >= args.max_wifi_ingest:
+                    threading.Thread(target=server.shutdown, daemon=True).start()
+            except Exception as exc:
+                LOG.warning('Wi-Fi record rejected: %s', type(exc).__name__)
+                self.send_error(400, 'Invalid signed record')
+
         def do_GET(self):
+            if self.client_address[0] not in local_status_clients:
+                self.send_error(403)
+                return
             if self.path not in ('/','/status'):
                 self.send_error(404)
                 return
             data = outbox.status()
-            data['serial_ports'] = [p.device for p in list_ports.comports()]
             data['signature_required'] = bool(config.get('require_signature'))
             data['cloud_url'] = config['cloud_url']
             body = json.dumps(data, indent=2).encode()
@@ -230,11 +262,15 @@ def main():
             self.wfile.write(body)
         def log_message(self, *args):
             pass
-    server = ThreadingHTTPServer(('127.0.0.1', args.status_port), Handler)
-    for target, params in [(upload_loop,(outbox,config)),(serial_loop,(outbox,config,args.port))]:
-        threading.Thread(target=target, args=params, daemon=True).start()
-    LOG.info('Gateway ready. USB auto-detection enabled; status http://127.0.0.1:%s/status',args.status_port)
+    server = ThreadingHTTPServer((bind, status_port), Handler)
+    if not args.local_only:
+        threading.Thread(target=upload_loop, args=(outbox, config), daemon=True).start()
+    LOG.info('Gateway ready on %s:%s; signed Wi-Fi ingest POST /ingest.', bind, status_port)
+    status_host = '127.0.0.1' if bind in ('0.0.0.0', '::') else bind
+    LOG.info('Local status: http://%s:%s/status', status_host, status_port)
     LOG.info('Signature enforcement: %s', bool(config.get('require_signature')))
+    if args.local_only:
+        LOG.info('Local-only mode: cloud upload disabled.')
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -15,7 +15,7 @@ os.environ["JWT_SECRET"] = secrets.token_urlsafe(48)
 os.environ["DEVICE_API_KEY"] = secrets.token_urlsafe(48)
 os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = secrets.token_urlsafe(24)
 os.environ["DEMO_USER_PASSWORD"] = secrets.token_urlsafe(24)
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "Tamper_admin_SIH" / "backend"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "Tamper_admin" / "backend"))
 from fastapi.testclient import TestClient
 from main import app
 from database import engine

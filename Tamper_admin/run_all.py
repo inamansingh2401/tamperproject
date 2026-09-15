@@ -13,7 +13,7 @@ ADMIN_FRONTEND_DIR = os.path.join(PROJECT_ROOT, "frontend")
 
 USER_PROJECT_ROOT = os.path.join(
     os.path.dirname(PROJECT_ROOT),
-    "Tamper_user_SIH"
+    "Tamper_user"
 )
 
 USER_FRONTEND_DIR = os.path.join(
@@ -40,7 +40,7 @@ USER_URL = f"http://{LOCAL_HOST}:{USER_PORT}"
 # ============================================================
 
 print("=" * 70)
-print(" SafeTrack - SIH MASTER LAUNCHER")
+print(" SafeTrack MASTER LAUNCHER")
 print(" Backend + Sensor Source + Admin + User Dashboard")
 print("=" * 70)
 
@@ -54,7 +54,7 @@ env_override = os.environ.copy()
 env_override.setdefault("DATABASE_URL", "sqlite:///./safetrack.db")
 env_override["DEMO_RESET"] = "false"
 
-# Real Hardware is default for live SIH demonstration.
+# Real hardware is the default for the live demonstration.
 # Simulator is only enabled if explicitly requested via --simulator argument or SAFETRACK_SIMULATOR=true environment variable.
 SIMULATOR_ENABLED = ("--simulator" in sys.argv) or (os.getenv("SAFETRACK_SIMULATOR", "false").lower() == "true")
 REAL_HARDWARE_MODE = not SIMULATOR_ENABLED
