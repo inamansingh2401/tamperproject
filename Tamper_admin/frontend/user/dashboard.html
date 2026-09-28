@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en" data-shared-login="../login.html">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8fafc">
+  <meta name="description" content="SafeTrack shipment condition, location, and integrity dashboard.">
+  <title>SafeTrack | Secure Every Shipment</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230057FF'/%3E%3Cpath d='M9 10.5 16 7l7 3.5v5.8c0 4.2-2.9 7.3-7 8.7-4.1-1.4-7-4.5-7-8.7z' fill='none' stroke='white' stroke-width='2'/%3E%3Cpath d='m12.5 16 2.2 2.2 4.8-5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="dashboard.css">
+  <script src="common.js"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.js" integrity="sha384-LtmWBcrD5iuFIR4sFphS8IiiaftkypL5dJzLKywbyd9ATLB7ZbPz3JYnI9nvXHkV" crossorigin="anonymous"></script>
+  <script src="../vendor/three.min.js"></script>
+<script src="../vendor/OrbitControls.js"></script>
+<script src="parcel.js?v=1" defer></script>
+<script src="dashboard.js?v=20260928-parcel" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">Skip to shipment overview</a>
+
+  <section id="loginScreen" hidden class="login-screen" aria-labelledby="loginTitle">
+    <div class="login-shell">
+      <div class="login-story" aria-hidden="true">
+        <div class="brand brand-on-dark">
+          <span class="brand-symbol"><i data-lucide="shield-check"></i></span>
+          <span><strong>SafeTrack</strong><small>Secure Every Shipment</small></span>
+        </div>
+        <div class="story-copy">
+          <p class="kicker kicker-light">CHAIN OF CUSTODY</p>
+          <h1>Confidence from dispatch to delivery.</h1>
+          <p>Live condition monitoring and tamper-evident records for every protected shipment.</p>
+        </div>
+        <div class="trust-line">
+          <span><i data-lucide="wifi"></i> Live telemetry</span>
+          <span><i data-lucide="fingerprint"></i> Signed events</span>
+          <span><i data-lucide="link-2"></i> Hash ledger</span>
+        </div>
+      </div>
+
+      <div class="login-panel">
+        <div class="brand brand-mobile">
+          <span class="brand-symbol"><i data-lucide="shield-check"></i></span>
+          <span><strong>SafeTrack</strong><small>Secure Every Shipment</small></span>
+        </div>
+        <div class="login-heading">
+          <p class="kicker">SECURE USER PORTAL</p>
+          <h2 id="loginTitle">Welcome back</h2>
+          <p>Sign in to view your assigned shipment.</p>
+        </div>
+        <form id="loginForm" class="login-form">
+          <label for="loginUser">Username</label>
+          <div class="input-wrap"><i data-lucide="user-round"></i><input id="loginUser" name="username" autocomplete="username" required></div>
+          <label for="loginPin">Password</label>
+          <div class="input-wrap"><i data-lucide="lock-keyhole"></i><input id="loginPin" name="password" type="password" autocomplete="current-password" required></div>
+          <p id="loginError" class="form-error" role="alert" aria-live="polite"></p>
+          <button id="loginButton" class="primary-button" type="submit"><span>Open dashboard</span><i data-lucide="arrow-right"></i></button>
+        </form>
+        <p class="login-note"><i data-lucide="shield"></i> Your session is protected and expires when this browser tab closes.</p>
+      </div>
+    </div>
+  </section>
+
+  <div id="appShell" class="app-shell" hidden>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="#overview" aria-label="SafeTrack dashboard home">
+          <span class="brand-symbol"><i data-lucide="shield-check"></i></span>
+          <span><strong>SafeTrack</strong><small>Secure Every Shipment</small></span>
+        </a>
+
+        <nav class="desktop-nav" aria-label="Dashboard sections">
+          <a class="nav-link active" href="#overview">Overview</a>
+          <a class="nav-link" href="#telemetry">Conditions</a>
+          <a class="nav-link" href="#events">Events</a>
+        </nav>
+
+        <div class="header-actions">
+          <label class="shipment-picker">
+            <span>Shipment</span>
+            <select id="shipmentSelector" aria-label="Select shipment"></select>
+          </label>
+          <div class="account">
+            <span id="userInitials" class="avatar">U</span>
+            <span class="account-copy"><strong id="headerUserName">User</strong><small>Authorized viewer</small></span>
+          </div>
+          <button id="logoutBtn" class="icon-button" type="button" aria-label="Sign out" title="Sign out"><i data-lucide="log-out"></i></button>
+        </div>
+      </div>
+    </header>
+
+    <div id="errorBanner" class="error-banner" role="alert" hidden>
+      <div><i data-lucide="cloud-off"></i><span id="errorText">Live data is temporarily unavailable.</span></div>
+      <button id="retryBtn" type="button">Retry</button>
+    </div>
+
+    <main id="mainContent" class="dashboard" tabindex="-1">
+      <section data-dashboard-section="overview" id="overview" class="overview-section" aria-labelledby="shipmentTitle">
+        <div class="overview-meta">
+          <div>
+            <p class="kicker">ACTIVE SHIPMENT</p>
+            <div class="title-line">
+              <h1 id="shipmentTitle">Loading shipment…</h1>
+              <span id="shipmentStatus" class="status-badge neutral">Loading</span>
+            </div>
+            <div class="shipment-reference">
+              <span id="shipmentCode" class="mono">—</span>
+              <span class="divider" aria-hidden="true"></span>
+              <span id="vehicleName">Vehicle not assigned</span>
+            </div>
+          </div>
+          <div class="sync-state" aria-live="polite">
+            <span id="syncDot" class="sync-dot"></span>
+            <span><strong id="syncStatus">Connecting</strong><small id="lastUpdated">Waiting for telemetry</small></span>
+          </div>
+        </div>
+
+        <div class="command-grid">
+          <article id="integrityCard" class="integrity-card state-monitoring">
+            <div class="integrity-head">
+              <span class="integrity-icon"><i id="integrityIcon" data-lucide="shield"></i></span>
+              <span id="integrityEyebrow" class="kicker">SECURITY MONITORING</span>
+            </div>
+            <h2 id="integrityStatus">Awaiting verified event</h2>
+            <p id="integrityMessage">SafeTrack is connecting to the shipment’s secure event stream.</p>
+            <div class="security-facts">
+              <div><span>Cryptographic record</span><strong id="cryptoStatus">Pending</strong></div>
+              <div><span>Container seal</span><strong id="sealStatus">—</strong></div>
+              <div><span>Device identity</span><strong id="deviceIdentity" class="mono">—</strong></div>
+            </div>
+          </article>
+
+          <article class="route-card surface">
+            <div class="section-label-row">
+              <div><p class="kicker">SHIPMENT JOURNEY</p><h2>Route progress</h2></div>
+              <span id="routeProgressLabel" class="small-label">Stage 1 of 4</span>
+            </div>
+            <div class="route-summary">
+              <div><span>From</span><strong id="originValue">—</strong></div>
+              <i data-lucide="arrow-right"></i>
+              <div><span>To</span><strong id="destinationValue">—</strong></div>
+            </div>
+            <ol id="journeyTrack" class="journey-track" aria-label="Shipment progress">
+              <li data-stage="0"><span class="stage-dot"><i data-lucide="check"></i></span><span><strong>Registered</strong><small>Shipment secured</small></span></li>
+              <li data-stage="1"><span class="stage-dot"><i data-lucide="truck"></i></span><span><strong>In transit</strong><small>On the move</small></span></li>
+              <li data-stage="2"><span class="stage-dot"><i data-lucide="navigation"></i></span><span><strong>Out for delivery</strong><small>Final route</small></span></li>
+              <li data-stage="3"><span class="stage-dot"><i data-lucide="package-check"></i></span><span><strong>Delivered</strong><small>Custody complete</small></span></li>
+            </ol>
+            <div class="location-strip">
+              <span class="location-pin"><i data-lucide="map-pin"></i></span>
+              <span><small>Current location</small><strong id="currentLocation">Not available</strong></span>
+              <span class="eta"><small>Estimated delivery</small><strong id="etaValue">Not provided</strong></span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section data-dashboard-section="telemetry" id="telemetry" class="content-section" aria-labelledby="telemetryTitle">
+        <div class="section-heading">
+          <div><p class="kicker">LIVE CONDITION</p><h2 id="telemetryTitle">Inside the shipment</h2></div>
+          <p>Sensor readings refresh automatically while this page is open.</p>
+        </div>
+        <div id="telemetryGrid" class="telemetry-grid" aria-live="polite">
+          <article class="metric-card" data-metric="temperature">
+            <div class="metric-head"><span class="metric-icon blue"><i data-lucide="thermometer"></i></span><span id="temperatureState" class="metric-state">Waiting</span></div>
+            <p>Temperature</p><div class="metric-reading"><strong id="temperatureValue">—</strong><span>°C</span></div>
+            <div class="range-track"><span id="temperatureMarker" class="range-marker"></span></div>
+            <small>Target range 2–8 °C</small>
+          </article>
+          <article class="metric-card" data-metric="humidity">
+            <div class="metric-head"><span class="metric-icon cyan"><i data-lucide="droplets"></i></span><span id="humidityState" class="metric-state">Waiting</span></div>
+            <p>Humidity</p><div class="metric-reading"><strong id="humidityValue">—</strong><span>%</span></div>
+            <div class="range-track"><span id="humidityMarker" class="range-marker"></span></div>
+            <small>Target range 40–60%</small>
+          </article>
+          <article class="metric-card" data-metric="light">
+            <div class="metric-head"><span class="metric-icon amber"><i data-lucide="sun-medium"></i></span><span id="lightState" class="metric-state">Waiting</span></div>
+            <p>Light exposure</p><div class="metric-reading"><strong id="lightValue">—</strong><span>lux</span></div>
+            <div class="range-track"><span id="lightMarker" class="range-marker"></span></div>
+            <small>Seal threshold 800 lux</small>
+          </article>
+          <article class="metric-card" data-metric="acceleration">
+            <div class="metric-head"><span class="metric-icon violet"><i data-lucide="activity"></i></span><span id="accelerationState" class="metric-state">Waiting</span></div>
+            <p>Acceleration</p><div class="metric-reading"><strong id="accelerationValue">—</strong><span>g</span></div>
+            <div class="range-track"><span id="accelerationMarker" class="range-marker"></span></div>
+            <small>Impact threshold 3.0 g</small>
+          </article>
+          <article class="surface orientation-section restored-parcel" style="margin-top:20px; padding:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--line);">
+          <div>
+            <p class="eyebrow">PHYSICAL TELEMETRY</p>
+            <h3 style="margin:2px 0 4px; font-size:16px; font-weight:700;">Shipment Condition & 3D Package Orientation</h3>
+            <p class="muted" style="font-size:12px;">Sensor-driven orientation responding directly to node MPU6050 accelerometer and gyroscope data.</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button id="resetPackageViewBtn" class="action-btn-sm" title="Reset Camera View">
+              <i data-lucide="rotate-ccw" style="width:13px; height:13px;"></i>
+              <span>Reset Camera</span>
+            </button>
+            <span class="font-mono" style="font-size:11px; color:var(--text-muted); background:var(--surface-alt); padding:4px 8px; border-radius:4px; border:1px solid var(--line);">MPU6050 6-DOF</span>
+          </div>
+        </div>
+
+        <div class="package-3d-layout">
+          <!-- 3D Canvas Viewport -->
+          <div class="package-viewport-wrapper">
+            <div id="package3dContainer" class="package-canvas-container">
+              <!-- Three.js Canvas renders here -->
+            </div>
+            <div class="package-viewport-overlay">
+              <span class="drag-hint"><i data-lucide="hand" style="width:12px; height:12px;"></i> Click & Drag to Inspect (View only · Does not alter sensor reading)</span>
+            </div>
+          </div>
+
+          <!-- MPU6050 & Orientation Metrics Sidebar -->
+          <div class="package-telemetry-meta">
+            <!-- Dynamic Status Badges -->
+            <div class="meta-status-group">
+              <div class="meta-status-card">
+                <span class="meta-card-label">Orientation Status</span>
+                <div id="orientationBadge" class="status good" style="margin-top:4px;">
+                  <i data-lucide="compass" style="width:12px; height:12px;"></i>
+                  <span id="orientationText">Stable (Upright)</span>
+                </div>
+              </div>
+              <div class="meta-status-card">
+                <span class="meta-card-label">Movement & Shock</span>
+                <div id="motionShockBadge" class="status good" style="margin-top:4px;">
+                  <i data-lucide="activity" style="width:12px; height:12px;"></i>
+                  <span id="motionShockText">Normal (&lt; 2.5g)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pitch / Roll / Tilt Angle Meters -->
+            <div class="angles-grid">
+              <div class="angle-card">
+                <span class="angle-label">Pitch Angle (Tilt X)</span>
+                <strong id="anglePitchVal" class="font-mono angle-value">0.0°</strong>
+              </div>
+              <div class="angle-card">
+                <span class="angle-label">Roll Angle (Tilt Z)</span>
+                <strong id="angleRollVal" class="font-mono angle-value">0.0°</strong>
+              </div>
+            </div>
+
+            <!-- Raw Sensor Readings (Accel & Gyro) -->
+            <div class="raw-sensor-block">
+              <div class="raw-sensor-row">
+                <span>Acceleration Vector (accel_g):</span>
+                <strong id="packageAccelVal" class="font-mono">— g</strong>
+              </div>
+              <div class="raw-sensor-row">
+                <span>Angular Velocity (gyro_dps):</span>
+                <strong id="packageGyroVal" class="font-mono">— °/s</strong>
+              </div>
+              <div class="raw-sensor-row">
+                <span>Last Telemetry Sync:</span>
+                <strong id="packageLastSync" class="font-mono">—</strong>
+              </div>
+            </div>
+
+            <div class="orientation-help-note">
+              <i data-lucide="info" style="width:13px; height:13px; color:var(--text-muted); flex-shrink:0;"></i>
+              <span>Orientation updates in real time when new IoT telemetry packets arrive. Package stabilizes automatically when motion settles.</span>
+            </div>
+          </div>
+        </div>
+      </article>
+        </div>
+      </section>
+
+      <section data-dashboard-section="overview" class="insight-grid" aria-label="Shipment location and alerts">
+        <article class="location-card surface">
+          <div class="section-label-row"><div><p class="kicker">LOCATION</p><h2>Latest checkpoint</h2></div><span class="outline-icon"><i data-lucide="map"></i></span></div>
+          <div class="map-field" aria-hidden="true">
+            <span class="map-route"></span><span class="map-node origin-node"></span><span class="map-node current-node"><i data-lucide="package"></i></span><span class="map-node destination-node"></span>
+          </div>
+          <div class="location-detail"><span class="location-pin"><i data-lucide="map-pin"></i></span><span><small>Last reported at</small><strong id="locationDetail">Not available</strong><em id="locationTimestamp">Waiting for a live reading</em></span></div>
+        </article>
+
+        <article class="alerts-card surface">
+          <div class="section-label-row"><div><p class="kicker">ATTENTION</p><h2>Alerts</h2></div><span id="alertCount" class="count-badge">0 active</span></div>
+          <div id="alertsList" class="alerts-list"><div class="empty-state compact"><i data-lucide="loader-circle"></i><span><strong>Checking shipment</strong><small>Loading alert history…</small></span></div></div>
+        </article>
+      </section>
+
+      <section data-dashboard-section="events" id="events" class="content-section events-section" aria-labelledby="eventsTitle">
+        <div class="section-heading events-heading">
+          <div><p class="kicker">TAMPER-EVIDENT RECORD</p><h2 id="eventsTitle">Recent verified events</h2></div>
+          <div class="ledger-summary"><i data-lucide="link-2"></i><span><strong id="eventCount">0 events</strong><small>Newest record first</small></span></div>
+        </div>
+        <div class="event-columns" aria-hidden="true"><span>Event</span><span>Reading</span><span>Recorded</span><span>Ledger hash</span><span>Verification</span></div>
+        <div id="eventList" class="event-list" aria-live="polite">
+          <div class="empty-state"><i data-lucide="loader-circle"></i><span><strong>Loading event ledger</strong><small>Retrieving the latest custody records…</small></span></div>
+        </div>
+      </section>
+    </main>
+
+    <nav class="mobile-nav" aria-label="Dashboard sections">
+      <a href="#overview" class="active"><i data-lucide="layout-dashboard"></i><span>Overview</span></a>
+      <a href="#telemetry"><i data-lucide="activity"></i><span>Conditions</span></a>
+      <a href="#events"><i data-lucide="list-checks"></i><span>Events</span></a>
+    </nav>
+  </div>
+</body>
+</html>

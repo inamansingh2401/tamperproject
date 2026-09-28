@@ -19,29 +19,19 @@ The launcher starts:
 
 Only one backend/database is used. The Admin and User dashboards read the same SafeTrack data.
 
-## Demo accounts
+## Accounts
 
-### Admin
-- Username: `admin`
-- Password: `admin123`
-
-### Users
-- `Rahul Sharma` / `1234` — shipments 001, 007
-- `Priya Sharma` / `1234` — shipments 002, 008
-- `Arjun Reddy` / `1234` — shipments 003, 009
-- `Neha Kapoor` / `1234` — shipments 004, 010
-
-The prototype intentionally has only two application roles: `admin` and `user`.
+Provision credentials through private environment configuration. Use `BOOTSTRAP_ADMIN_PASSWORD` and `DEMO_USER_PASSWORD` for isolated development; production values must be unique and never published. The supported roles are `admin` and `user`.
 
 ## Demo architecture
 
-ESP32-S3 → Wi-Fi → laptop gateway → HTTPS FastAPI → PostgreSQL/SQLAlchemy → Admin + User dashboards.
+ESP32-S3 â†’ Wi-Fi â†’ laptop gateway â†’ HTTPS FastAPI â†’ PostgreSQL/SQLAlchemy â†’ Admin + User dashboards.
 
 Each shipment has independent telemetry and its own hash chain, even when multiple shipments share a vehicle.
 
 ## Production deployment
 
-For deployment, set `DATABASE_URL` to a managed PostgreSQL connection string. Also set unique `JWT_SECRET` and `DEVICE_API_KEY` values in Render's environment settings. The code accepts provider URLs beginning with either `postgres://` or `postgresql://` and uses psycopg 3.
+For deployment, set `DATABASE_URL` to a managed PostgreSQL connection string. Set unique `JWT_SECRET`, `DEVICE_API_KEY`, account bootstrap passwords and `CORS_ORIGINS` in the API host environment. The code accepts provider URLs beginning with either `postgres://` or `postgresql://` and uses psycopg 3.
 
 To copy an existing local SQLite database once:
 
@@ -76,3 +66,7 @@ Vehicle codes and shipment codes are intentionally different. Example: `TRK-MH-0
 ## User portal
 
 The User portal is intentionally simplified into tabs: Overview, Shipment, Environment, Alerts, and History. It uses a light, restrained visual theme and only shows shipments assigned to the logged-in user.
+
+## Current unified frontend
+
+The deployed frontend is `frontend/`: a single login serves both roles. Run `npm install` and `npm run build` there, then serve the folder. See [deployment guide](../docs/DEPLOYMENT.md).

@@ -1,4 +1,4 @@
-const SAFETRACK_USER_DASHBOARD = "https://safetrack-user-live-chi.vercel.app/";
+const SAFETRACK_USER_DASHBOARD = "user/dashboard.html";
 
 function getAuthToken() {
     return sessionStorage.getItem("safetrack_access_token");

@@ -20,10 +20,11 @@ app = FastAPI(title="SafeTrack Unified Admin & Operations API", version="3.0.0")
 
 # These are the two current deployments and explicit local development origins.
 ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", ",".join([
+    "https://safetrack-portal.vercel.app",
     "https://safetrack-admin-live-mu.vercel.app",
     "https://safetrack-user-live-chi.vercel.app",
     "http://localhost:5500", "http://localhost:5501",
-    "http://127.0.0.1:5500", "http://127.0.0.1:5501", "http://127.0.0.1:5511",
+    "http://127.0.0.1:5500", "http://127.0.0.1:5501", "http://127.0.0.1:5511", "http://127.0.0.1:5512", "http://localhost:5512",
 ])).split(",")
 app.add_middleware(
     CORSMiddleware,

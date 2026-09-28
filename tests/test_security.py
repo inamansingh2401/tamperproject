@@ -47,6 +47,12 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/shipments/PRCL-2024-05-21-002", headers=self.user_headers).status_code, 403)
         self.assertEqual(self.client.get("/api/shipments/PRCL-2024-05-21-001", headers=self.user_headers).status_code, 200)
 
+    def test_shared_portal_live_and_admin_boundaries(self):
+        self.assertEqual(self.client.get("/api/shipments/PRCL-2024-05-21-001/live").status_code, 401)
+        self.assertEqual(self.client.get("/api/admin/dashboard", headers=self.user_headers).status_code, 403)
+        self.assertEqual(self.client.get("/api/shipments/PRCL-2024-05-21-002/live", headers=self.user_headers).status_code, 403)
+        self.assertEqual(self.client.get("/api/shipments/PRCL-2024-05-21-001/live", headers=self.user_headers).status_code, 200)
+
     def test_device_key_is_never_logged(self):
         buffer = io.StringIO()
         rejected_key = secrets.token_hex(24)

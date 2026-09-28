@@ -46,7 +46,7 @@ The complete real-event path through Wi-Fi, gateway verification/ACK, HTTPS inge
 - Backend startup performs schema creation/light migration rather than using a versioned migration framework.
 - Device signatures are verified at the gateway, while the backend receives normalized telemetry and does not independently verify the original envelope.
 - `tracksure_final_code.ino` is a historical, non-authoritative sketch; only the nested firmware sketch should be flashed.
-- The adjacent `safetrack_Admin_SIH_Final/` workspace directory is legacy and outside this repository.
+- The adjacent the archived workspace snapshot workspace directory is legacy and outside this repository.
 - The current hardware/software path is a prototype; endurance, load, offline duration, backup, monitoring, and operational security testing are incomplete.
 
 ## 5. Not Yet Implemented

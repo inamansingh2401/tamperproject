@@ -8,22 +8,22 @@ let alertsList = [];
 let filteredVehiclesList = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
-    await loadDashboardData();
     initCharts();
     if (window.lucide) lucide.createIcons();
+    await loadDashboardData();
 });
 
 async function loadDashboardData() {
     try {
-        vehiclesList = await SafeTrackAPI.getVehicles();
-        shipmentsList = await SafeTrackAPI.getShipments();
-        alertsList = await SafeTrackAPI.getAlerts();
-        filteredVehiclesList = [...vehiclesList];
-
-        renderKPIs();
-        renderVehiclesTable();
-        renderRecentAlertsFeed();
-        populateVehicleDropdown();
+        await Promise.all([
+            SafeTrackAPI.getVehicles().then(data => {
+                vehiclesList = data;
+                filteredVehiclesList = [...vehiclesList];
+                renderKPIs(); renderVehiclesTable(); populateVehicleDropdown();
+            }),
+            SafeTrackAPI.getShipments().then(data => { shipmentsList = data; renderKPIs(); }),
+            SafeTrackAPI.getAlerts().then(data => { alertsList = data; renderKPIs(); renderRecentAlertsFeed(); })
+        ]);
     } catch (err) {
         console.error("Error loading dashboard data:", err);
         showToast("Error loading dashboard state", "error");

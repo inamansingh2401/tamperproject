@@ -2,7 +2,7 @@
 
 ## Scope and repository selection
 
-This map covers the authoritative Git repository `tamperproject/`. The adjacent workspace directory `safetrack_Admin_SIH_Final/` is a legacy snapshot outside this repository and is not an active source tree. Generated firmware artifacts, local databases, credentials, logs, and deployment metadata are intentionally excluded.
+This map covers the authoritative Git repository `tamperproject/`. The adjacent workspace directory the archived workspace snapshot is a legacy snapshot outside this repository and is not an active source tree. Generated firmware artifacts, local databases, credentials, logs, and deployment metadata are intentionally excluded.
 
 ## End-to-end data flow
 
@@ -16,36 +16,36 @@ This map covers the authoritative Git repository `tamperproject/`. The adjacent 
 
 ### Firmware / MPU / LDR
 
-| Path | Responsibility | Data in → data out |
+| Path | Responsibility | Data in â†’ data out |
 |---|---|---|
-| `tamperproject/firmware/tracksure_gateway/tracksure_gateway.ino` | Canonical ESP32-S3 device entry point: initializes DHT11, inverted LDR, MPU6050, ATECC, and optional local Wi-Fi settings; samples sensors, derives shock/orientation, signs and queues telemetry. | GPIO/I2C readings + identity + ignored Wi-Fi configuration + HTTP ACKs → signed envelopes over Wi-Fi/LAN. USB Serial is debugging/flashing only. |
-| `tamperproject/firmware/tracksure_gateway/orientation.h` | Orientation helper used by the canonical firmware for filtered/quaternion orientation state. | Accelerometer/gyroscope samples and elapsed time → orientation values included in telemetry. |
-| `tamperproject/tracksure_final_code.ino` | Root-level alternate firmware entry with substantially the same USB/signed telemetry role. Its presence makes the authoritative sketch ambiguous. | DHT/LDR/MPU/ATECC readings + ACKs → signed `TRACKSURE` serial records. |
+| `tamperproject/firmware/tracksure_gateway/tracksure_gateway.ino` | Canonical ESP32-S3 device entry point: initializes DHT11, inverted LDR, MPU6050, ATECC, and optional local Wi-Fi settings; samples sensors, derives shock/orientation, signs and queues telemetry. | GPIO/I2C readings + identity + ignored Wi-Fi configuration + HTTP ACKs â†’ signed envelopes over Wi-Fi/LAN. USB Serial is debugging/flashing only. |
+| `tamperproject/firmware/tracksure_gateway/orientation.h` | Orientation helper used by the canonical firmware for filtered/quaternion orientation state. | Accelerometer/gyroscope samples and elapsed time â†’ orientation values included in telemetry. |
+| `tamperproject/tracksure_final_code.ino` | Root-level alternate firmware entry with substantially the same USB/signed telemetry role. Its presence makes the authoritative sketch ambiguous. | DHT/LDR/MPU/ATECC readings + ACKs â†’ signed `TRACKSURE` serial records. |
 
 ### Gateway delivery
 
-| Path | Responsibility | Data in → data out |
+| Path | Responsibility | Data in â†’ data out |
 |---|---|---|
-| `tamperproject/gateway/gateway.py` | Gateway entry point; accepts signed HTTP `POST /ingest` records over a configured LAN bind, strictly parses and verifies them, persists a SQLite outbox, returns JSON ACKs after disk commits, uploads one ordered live record at a time, and exposes local `/status`. | Signed device envelope + ignored local config (`gateway.local.json`) → local outbox row + matching JSON ACK + HTTPS `POST /api/events` + local status JSON. |
-| `tamperproject/gateway/start-gateway.cmd` | Windows launcher for the gateway. | Command-line arguments → `python gateway.py` process and console output. |
-| `tamperproject/gateway/enable-wifi-firewall.ps1` | Optional Windows firewall setup for the gateway's signed Wi-Fi ingest listener. | Local firewall/network parameters → Windows firewall rule permitting the configured gateway port. |
-| `tamperproject/gateway/requirements.txt` | Pins gateway HTTP and crypto libraries. | Package installer → `httpx` and `cryptography` runtime dependencies. |
+| `tamperproject/gateway/gateway.py` | Gateway entry point; accepts signed HTTP `POST /ingest` records over a configured LAN bind, strictly parses and verifies them, persists a SQLite outbox, returns JSON ACKs after disk commits, uploads one ordered live record at a time, and exposes local `/status`. | Signed device envelope + ignored local config (`gateway.local.json`) â†’ local outbox row + matching JSON ACK + HTTPS `POST /api/events` + local status JSON. |
+| `tamperproject/gateway/start-gateway.cmd` | Windows launcher for the gateway. | Command-line arguments â†’ `python gateway.py` process and console output. |
+| `tamperproject/gateway/enable-wifi-firewall.ps1` | Optional Windows firewall setup for the gateway's signed Wi-Fi ingest listener. | Local firewall/network parameters â†’ Windows firewall rule permitting the configured gateway port. |
+| `tamperproject/gateway/requirements.txt` | Pins gateway HTTP and crypto libraries. | Package installer â†’ `httpx` and `cryptography` runtime dependencies. |
 
 Runtime-only inputs intentionally absent from version control: `gateway/gateway.local.json` supplies `cloud_url`, `device_id`, `shipment_code`, `device_key`, signature policy, and public-key path; the referenced enrolled public key and generated `gateway-outbox.db` also remain local.
 
 ### Backend API / database
 
-| Path | Responsibility | Data in → data out |
+| Path | Responsibility | Data in â†’ data out |
 |---|---|---|
-| `tamperproject/Tamper_admin/backend/main.py` | FastAPI application entry and complete route layer; configures CORS/security headers, seeds/migrates schema, enforces JWT roles, handles domain CRUD, ingests telemetry, validates chaining, updates shipment state, and raises alerts. | HTTP JSON/headers + authenticated user/device + SQLAlchemy session → HTTP JSON/errors + database reads/writes. |
-| `tamperproject/Tamper_admin/backend/database.py` | Selects SQLite or PostgreSQL from `DATABASE_URL`, creates the SQLAlchemy engine/session factory, and supplies request-scoped sessions. | Environment/database URL → engine, schema base, and DB sessions. |
-| `tamperproject/Tamper_admin/backend/models.py` | Persistence schema for users, enrolled devices, vehicles, shipments, sensor events, shipment alerts, and system settings. | ORM object changes → relational rows/relationships; queries → domain objects. |
-| `tamperproject/Tamper_admin/backend/auth.py` | Password hashing/verification and JWT creation/decoding using environment-backed secrets and expiry. | Credentials/claims + `JWT_SECRET` → password hashes or signed/decoded access tokens. |
-| `tamperproject/Tamper_admin/backend/hashchain.py` | Produces deterministic event hashes linking telemetry records. | Shipment/device/sensor fields + previous hash → SHA-256 event hash. |
-| `tamperproject/Tamper_admin/backend/simulate_esp32.py` | Optional development producer that generates bounded sensor payloads and sends them to the ingest API. | Simulator configuration/state → repeated `/api/events` requests. |
-| `tamperproject/Tamper_admin/backend/migrate_sqlite_to_postgres.py` | One-time data migration utility from the local SQLite schema to the configured PostgreSQL database. | Local `safetrack.db` + target `DATABASE_URL` → copied PostgreSQL rows/sequences. |
-| `tamperproject/Tamper_admin/backend/requirements.txt` | Declares API, ORM, PostgreSQL, authentication, and validation dependencies. | Package installer → backend Python runtime. |
-| `tamperproject/Tamper_admin/run_all.py` | Local orchestration entry: starts Uvicorn, optional simulator, and static admin/user servers, then opens dashboards and coordinates shutdown. | Environment/CLI flag (`--simulator`) → four local processes and browser pages. |
+| `tamperproject/Tamper_admin/backend/main.py` | FastAPI application entry and complete route layer; configures CORS/security headers, seeds/migrates schema, enforces JWT roles, handles domain CRUD, ingests telemetry, validates chaining, updates shipment state, and raises alerts. | HTTP JSON/headers + authenticated user/device + SQLAlchemy session â†’ HTTP JSON/errors + database reads/writes. |
+| `tamperproject/Tamper_admin/backend/database.py` | Selects SQLite or PostgreSQL from `DATABASE_URL`, creates the SQLAlchemy engine/session factory, and supplies request-scoped sessions. | Environment/database URL â†’ engine, schema base, and DB sessions. |
+| `tamperproject/Tamper_admin/backend/models.py` | Persistence schema for users, enrolled devices, vehicles, shipments, sensor events, shipment alerts, and system settings. | ORM object changes â†’ relational rows/relationships; queries â†’ domain objects. |
+| `tamperproject/Tamper_admin/backend/auth.py` | Password hashing/verification and JWT creation/decoding using environment-backed secrets and expiry. | Credentials/claims + `JWT_SECRET` â†’ password hashes or signed/decoded access tokens. |
+| `tamperproject/Tamper_admin/backend/hashchain.py` | Produces deterministic event hashes linking telemetry records. | Shipment/device/sensor fields + previous hash â†’ SHA-256 event hash. |
+| `tamperproject/Tamper_admin/backend/simulate_esp32.py` | Optional development producer that generates bounded sensor payloads and sends them to the ingest API. | Simulator configuration/state â†’ repeated `/api/events` requests. |
+| `tamperproject/Tamper_admin/backend/migrate_sqlite_to_postgres.py` | One-time data migration utility from the local SQLite schema to the configured PostgreSQL database. | Local `safetrack.db` + target `DATABASE_URL` â†’ copied PostgreSQL rows/sequences. |
+| `tamperproject/Tamper_admin/backend/requirements.txt` | Declares API, ORM, PostgreSQL, authentication, and validation dependencies. | Package installer â†’ backend Python runtime. |
+| `tamperproject/Tamper_admin/run_all.py` | Local orchestration entry: starts Uvicorn, optional simulator, and static admin/user servers, then opens dashboards and coordinates shutdown. | Environment/CLI flag (`--simulator`) â†’ four local processes and browser pages. |
 
 Route groups in `main.py`:
 
@@ -65,64 +65,64 @@ All browser-to-backend data uses JSON over HTTPS. Authentication state is held i
 
 #### Admin frontend
 
-| Path | Responsibility | Data in → data out |
+| Path | Responsibility | Data in â†’ data out |
 |---|---|---|
-| `tamperproject/Tamper_admin/frontend/login.html` | Admin/user sign-in page shell. | User form input + shared styles/scripts → login submission UI. |
-| `tamperproject/Tamper_admin/frontend/login.js` | Calls login, stores returned session data, and routes users by role. | Username/password → JWT/session fields → admin or user dashboard navigation. |
-| `tamperproject/Tamper_admin/frontend/index.html` | Main admin dashboard markup for KPIs, vehicles, alerts, and charts. | Controller-rendered domain data → visible dashboard and navigation actions. |
-| `tamperproject/Tamper_admin/frontend/script.js` | Loads vehicles, shipments, and alerts and renders dashboard tables, KPIs, filters, and charts. | `SafeTrackAPI` results + UI actions → DOM/chart updates and API-triggering actions. |
-| `tamperproject/Tamper_admin/frontend/shipments.html` | Shipment management and telemetry inspection page shell. | Shipment/controller state → list, forms, inspector, and 3D package UI. |
-| `tamperproject/Tamper_admin/frontend/shipments.js` | Shipment CRUD/filtering and live telemetry/orientation controller. | Shipment API data + form/inspection actions → writes, tables, telemetry history, and Three.js orientation. |
-| `tamperproject/Tamper_admin/frontend/vehicle-details.html` | Vehicle detail/assignment page shell. | Vehicle and shipment state → details, charts, assignment controls. |
-| `tamperproject/Tamper_admin/frontend/vehicle-details.js` | Loads one vehicle and related shipments and handles assignment/removal. | URL vehicle ID + API results/actions → rendered detail and relationship mutations. |
-| `tamperproject/Tamper_admin/frontend/alerts.html` | Alert management page shell. | Alert data/actions → alert table and resolution controls. |
-| `tamperproject/Tamper_admin/frontend/alerts.js` | Loads, filters, and resolves individual/all alerts. | Alert API results + user actions → resolution requests and refreshed DOM. |
-| `tamperproject/Tamper_admin/frontend/users.html` | User/role administration page shell. | User records/actions → user table and edit/create controls. |
-| `tamperproject/Tamper_admin/frontend/users.js` | User CRUD/status controller. | User API data + form actions → user mutations and rendered table. |
-| `tamperproject/Tamper_admin/frontend/settings.html` | System, notification, and security settings page shell. | Settings state/actions → settings forms. |
-| `tamperproject/Tamper_admin/frontend/settings.js` | Loads/saves settings and changes the admin password. | Settings/password forms + API values → settings/password requests and UI feedback. |
-| `tamperproject/Tamper_admin/frontend/reports.html` | Reports page shell. | Report/controller data → report cards and charts. |
-| `tamperproject/Tamper_admin/frontend/reports.js` | Initializes report visualizations; some displayed series are static while summary access exists in the shared API layer. | Page load (and any API-fed summary consumers) → Chart.js graphics. |
-| `tamperproject/Tamper_admin/frontend/live.html` | Compact live sensor monitor page shell. | Login/shipment selections → latest values/history display. |
-| `tamperproject/Tamper_admin/frontend/live.js` | Authenticates and repeatedly reads shipment detail for the selected shipment. | Credentials/JWT + shipment code → telemetry/status/history DOM updates. |
-| `tamperproject/Tamper_admin/frontend/api.js` | Central authenticated API client for vehicles, shipments/live data, alerts, users, settings, and reports. | Session JWT + method payloads → HTTPS requests to cloud API → normalized JSON/errors. |
-| `tamperproject/Tamper_admin/frontend/auth.js` | Admin route guard and logout/role redirect logic. | Session token/role → allowed page, login redirect, or user-dashboard redirect. |
-| `tamperproject/Tamper_admin/frontend/common.js` | Shared timeout, output escaping, safe action dispatch, and responsive navigation/accessibility behavior. | DOM/events/fetch requests → sanitized UI behavior and bounded network calls. |
-| `tamperproject/Tamper_admin/frontend/style.css` | Shared custom admin visual styles. | CSS selectors/HTML state → desktop presentation. |
-| `tamperproject/Tamper_admin/frontend/mobile.css` | Responsive/mobile overrides shared by admin pages. | Viewport and DOM state → mobile layout/navigation. |
-| `tamperproject/Tamper_admin/frontend/tailwind.input.css` | Tailwind source stylesheet. | Tailwind directives/config/content scan → compiled CSS input. |
-| `tamperproject/Tamper_admin/frontend/tailwind.config.cjs` | Tailwind content/theme configuration. | HTML/JS source paths and theme values → build-time class generation. |
-| `tamperproject/Tamper_admin/frontend/tailwind.css` | Generated stylesheet served by the static frontend. | Tailwind build → browser styling rules. |
+| `tamperproject/Tamper_admin/frontend/login.html` | Admin/user sign-in page shell. | User form input + shared styles/scripts â†’ login submission UI. |
+| `tamperproject/Tamper_admin/frontend/login.js` | Calls login, stores returned session data, and routes users by role. | Username/password â†’ JWT/session fields â†’ admin or user dashboard navigation. |
+| `tamperproject/Tamper_admin/frontend/index.html` | Main admin dashboard markup for KPIs, vehicles, alerts, and charts. | Controller-rendered domain data â†’ visible dashboard and navigation actions. |
+| `tamperproject/Tamper_admin/frontend/script.js` | Loads vehicles, shipments, and alerts and renders dashboard tables, KPIs, filters, and charts. | `SafeTrackAPI` results + UI actions â†’ DOM/chart updates and API-triggering actions. |
+| `tamperproject/Tamper_admin/frontend/shipments.html` | Shipment management and telemetry inspection page shell. | Shipment/controller state â†’ list, forms, inspector, and 3D package UI. |
+| `tamperproject/Tamper_admin/frontend/shipments.js` | Shipment CRUD/filtering and live telemetry/orientation controller. | Shipment API data + form/inspection actions â†’ writes, tables, telemetry history, and Three.js orientation. |
+| `tamperproject/Tamper_admin/frontend/vehicle-details.html` | Vehicle detail/assignment page shell. | Vehicle and shipment state â†’ details, charts, assignment controls. |
+| `tamperproject/Tamper_admin/frontend/vehicle-details.js` | Loads one vehicle and related shipments and handles assignment/removal. | URL vehicle ID + API results/actions â†’ rendered detail and relationship mutations. |
+| `tamperproject/Tamper_admin/frontend/alerts.html` | Alert management page shell. | Alert data/actions â†’ alert table and resolution controls. |
+| `tamperproject/Tamper_admin/frontend/alerts.js` | Loads, filters, and resolves individual/all alerts. | Alert API results + user actions â†’ resolution requests and refreshed DOM. |
+| `tamperproject/Tamper_admin/frontend/users.html` | User/role administration page shell. | User records/actions â†’ user table and edit/create controls. |
+| `tamperproject/Tamper_admin/frontend/users.js` | User CRUD/status controller. | User API data + form actions â†’ user mutations and rendered table. |
+| `tamperproject/Tamper_admin/frontend/settings.html` | System, notification, and security settings page shell. | Settings state/actions â†’ settings forms. |
+| `tamperproject/Tamper_admin/frontend/settings.js` | Loads/saves settings and changes the admin password. | Settings/password forms + API values â†’ settings/password requests and UI feedback. |
+| `tamperproject/Tamper_admin/frontend/reports.html` | Reports page shell. | Report/controller data â†’ report cards and charts. |
+| `tamperproject/Tamper_admin/frontend/reports.js` | Initializes report visualizations; some displayed series are static while summary access exists in the shared API layer. | Page load (and any API-fed summary consumers) â†’ Chart.js graphics. |
+| `tamperproject/Tamper_admin/frontend/live.html` | Compact live sensor monitor page shell. | Login/shipment selections â†’ latest values/history display. |
+| `tamperproject/Tamper_admin/frontend/live.js` | Authenticates and repeatedly reads shipment detail for the selected shipment. | Credentials/JWT + shipment code â†’ telemetry/status/history DOM updates. |
+| `tamperproject/Tamper_admin/frontend/api.js` | Central authenticated API client for vehicles, shipments/live data, alerts, users, settings, and reports. | Session JWT + method payloads â†’ HTTPS requests to cloud API â†’ normalized JSON/errors. |
+| `tamperproject/Tamper_admin/frontend/auth.js` | Admin route guard and logout/role redirect logic. | Session token/role â†’ allowed page, login redirect, or user-dashboard redirect. |
+| `tamperproject/Tamper_admin/frontend/common.js` | Shared timeout, output escaping, safe action dispatch, and responsive navigation/accessibility behavior. | DOM/events/fetch requests â†’ sanitized UI behavior and bounded network calls. |
+| `tamperproject/Tamper_admin/frontend/style.css` | Shared custom admin visual styles. | CSS selectors/HTML state â†’ desktop presentation. |
+| `tamperproject/Tamper_admin/frontend/mobile.css` | Responsive/mobile overrides shared by admin pages. | Viewport and DOM state â†’ mobile layout/navigation. |
+| `tamperproject/Tamper_admin/frontend/tailwind.input.css` | Tailwind source stylesheet. | Tailwind directives/config/content scan â†’ compiled CSS input. |
+| `tamperproject/Tamper_admin/frontend/tailwind.config.cjs` | Tailwind content/theme configuration. | HTML/JS source paths and theme values â†’ build-time class generation. |
+| `tamperproject/Tamper_admin/frontend/tailwind.css` | Generated stylesheet served by the static frontend. | Tailwind build â†’ browser styling rules. |
 
 #### User frontend
 
-| Path | Responsibility | Data in → data out |
+| Path | Responsibility | Data in â†’ data out |
 |---|---|---|
-| `tamperproject/Tamper_user/frontend/index.html` | Operator/user dashboard shell with shipment telemetry, charts, and 3D package view. | Controller-rendered assigned shipment data → dashboard UI and user actions. |
-| `tamperproject/Tamper_user/frontend/app.js` | Login/session flow, assigned-shipment reads, polling, charts, and MPU-driven package orientation. | Credentials/JWT + shipment API data → authenticated dashboard, telemetry/history, charts, and Three.js pose. |
-| `tamperproject/Tamper_user/frontend/live.html` | Compact live sensor monitor shell. | Login/shipment selection → current telemetry and history table. |
-| `tamperproject/Tamper_user/frontend/live.js` | Authenticates, constrains shipment choices by assignment, and polls `/shipments/{code}/live`. | Credentials/JWT + assigned shipment code → live values, freshness, seal state, and history DOM. |
-| `tamperproject/Tamper_user/frontend/common.js` | Shared timeout, escaping, session cleanup, and responsive navigation/accessibility behavior. | DOM/events/fetch requests → safe responsive UI and bounded calls. |
-| `tamperproject/Tamper_user/frontend/style.css` | Main user-dashboard styling. | HTML/DOM state → desktop presentation. |
-| `tamperproject/Tamper_user/frontend/mobile.css` | User-dashboard responsive overrides. | Viewport and DOM state → mobile presentation. |
+| `tamperproject/Tamper_user/frontend/index.html` | Operator/user dashboard shell with shipment telemetry, charts, and 3D package view. | Controller-rendered assigned shipment data â†’ dashboard UI and user actions. |
+| `tamperproject/Tamper_user/frontend/app.js` | Login/session flow, assigned-shipment reads, polling, charts, and MPU-driven package orientation. | Credentials/JWT + shipment API data â†’ authenticated dashboard, telemetry/history, charts, and Three.js pose. |
+| `tamperproject/Tamper_user/frontend/live.html` | Compact live sensor monitor shell. | Login/shipment selection â†’ current telemetry and history table. |
+| `tamperproject/Tamper_user/frontend/live.js` | Authenticates, constrains shipment choices by assignment, and polls `/shipments/{code}/live`. | Credentials/JWT + assigned shipment code â†’ live values, freshness, seal state, and history DOM. |
+| `tamperproject/Tamper_user/frontend/common.js` | Shared timeout, escaping, session cleanup, and responsive navigation/accessibility behavior. | DOM/events/fetch requests â†’ safe responsive UI and bounded calls. |
+| `tamperproject/Tamper_user/frontend/style.css` | Main user-dashboard styling. | HTML/DOM state â†’ desktop presentation. |
+| `tamperproject/Tamper_user/frontend/mobile.css` | User-dashboard responsive overrides. | Viewport and DOM state â†’ mobile presentation. |
 
 ### Deployment / Vercel
 
-| Path | Responsibility | Data in → data out |
+| Path | Responsibility | Data in â†’ data out |
 |---|---|---|
-| `tamperproject/Tamper_admin/frontend/vercel.json` | Configures the admin static build/output and response security/cache headers; CSP permits the live API and required UI CDNs. | Vercel build/request context → Tailwind build, static files, and HTTP headers. |
-| `tamperproject/Tamper_admin/frontend/package.json` | Defines the admin Tailwind production build and its development dependency. | `npm run build` + source CSS/config → minified `tailwind.css`. |
-| `tamperproject/Tamper_admin/frontend/pnpm-lock.yaml` | Locks the frontend build dependency graph. | Package manager resolution → reproducible installed build packages. |
-| `tamperproject/Tamper_user/frontend/vercel.json` | Configures static user-site security/cache headers and allows connections to the live API. | Vercel request context → static responses with CSP and security headers. |
-| `tamperproject/Tamper_admin/backend/database.py` | Deployment-sensitive database adapter; translates provider PostgreSQL URLs and enables connection health checks. | Vercel/host `DATABASE_URL` → PostgreSQL connection pool (or local SQLite fallback). |
-| `tamperproject/Tamper_admin/backend/main.py` | ASGI application object (`app`) expected by an external Python deployment adapter. | Platform ASGI requests/environment → API responses and managed-database access. |
+| `tamperproject/Tamper_admin/frontend/vercel.json` | Configures the admin static build/output and response security/cache headers; CSP permits the live API and required UI CDNs. | Vercel build/request context â†’ Tailwind build, static files, and HTTP headers. |
+| `tamperproject/Tamper_admin/frontend/package.json` | Defines the admin Tailwind production build and its development dependency. | `npm run build` + source CSS/config â†’ minified `tailwind.css`. |
+| `tamperproject/Tamper_admin/frontend/pnpm-lock.yaml` | Locks the frontend build dependency graph. | Package manager resolution â†’ reproducible installed build packages. |
+| `tamperproject/Tamper_user/frontend/vercel.json` | Configures static user-site security/cache headers and allows connections to the live API. | Vercel request context â†’ static responses with CSP and security headers. |
+| `tamperproject/Tamper_admin/backend/database.py` | Deployment-sensitive database adapter; translates provider PostgreSQL URLs and enables connection health checks. | Vercel/host `DATABASE_URL` â†’ PostgreSQL connection pool (or local SQLite fallback). |
+| `tamperproject/Tamper_admin/backend/main.py` | ASGI application object (`app`) expected by an external Python deployment adapter. | Platform ASGI requests/environment â†’ API responses and managed-database access. |
 
 Required production configuration inferred from code/docs includes `DATABASE_URL`, `JWT_SECRET`, and `DEVICE_API_KEY`. The gateway must carry the matching device key locally. Frontend API URLs and cross-site policy are currently hard-coded to the live API hostname.
 
 ## Important uncertainties
 
 - **Firmware entry point:** `tamperproject/firmware/tracksure_gateway/tracksure_gateway.ino` is authoritative and was compiled/flashed for the verified Wi-Fi path. `tamperproject/tracksure_final_code.ino` is a retained, non-authoritative historical sketch and must not be used for production flashing.
-- **Legacy workspace tree:** the adjacent `safetrack_Admin_SIH_Final/` directory remains outside this repository for historical recovery and must not be mixed into active changes.
+- **Legacy workspace tree:** the adjacent the archived workspace snapshot directory remains outside this repository for historical recovery and must not be mixed into active changes.
 - **Backend deployment:** the existing API is running on Vercel and was verified through `/api/events` and shipment live/detail reads. No checked-in backend Vercel manifest or infrastructure-as-code is present, so recreating that deployment still depends on external project configuration.
 - **Gateway local configuration:** `gateway.local.json`, the enrolled public key, and runtime outbox are intentionally ignored, so enrollment values and the actual cloud target cannot be verified from committed files.
 - **Admin live endpoint difference:** the compact admin live client reads `/shipments/{code}`, while the compact user live client reads `/shipments/{code}/live`; both route shapes exist, but their refresh semantics differ.

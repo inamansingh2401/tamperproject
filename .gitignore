@@ -16,3 +16,14 @@
 **/*.db-*
 artifacts/
 **/tempCodeRunnerFile.py
+
+# Private runtime output and unpublished material
+**/*.log
+**/*.log.*
+**/.venv/
+**/.pytest_cache/
+**/*.ppt
+**/*.pptx
+**/*.pptm
+
+Tamper_admin/frontend/media/truck-boxes-login*.mp4

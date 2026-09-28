@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import math
 import sqlite3
 import threading
@@ -206,6 +207,10 @@ def main():
     if args.max_wifi_ingest is not None and args.max_wifi_ingest < 1:
         raise SystemExit('--max-wifi-ingest must be at least 1')
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+    file_log = RotatingFileHandler(ROOT / 'gateway-runtime.local.log', maxBytes=5_000_000,
+                                   backupCount=3, encoding='utf-8')
+    file_log.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
+    LOG.addHandler(file_log)
     outbox = Outbox(Path(args.outbox))
     local_status_clients = {'127.0.0.1', '::1'}
     if bind not in ('0.0.0.0', '::'):

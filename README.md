@@ -1,6 +1,12 @@
-# TrackSure
+# SafeTrack
 
 TrackSure is a shipment-security and condition-monitoring platform. It records environmental and motion data at the parcel, cryptographically signs each accepted record, preserves a hash-linked evidence trail, and presents the verified shipment state in separate Admin and User dashboards.
+
+## Live portal
+
+[Open SafeTrack](https://safetrack-portal.vercel.app). One login routes administrators to the operations console and assigned users to their shipment dashboard. Request an account from the project operator; production credentials are not published.
+
+The shared login includes the truck introduction, optional sound replay, and a reduced-motion fallback. The user portal separates Overview, Conditions and Events; Conditions includes the sensor-driven 3D parcel. The admin Vehicles page supports fleet search, filtering and vehicle detail navigation.
 
 ## Why it exists
 
@@ -32,7 +38,7 @@ The battery-powered firmware emits signed telemetry over Wi-Fi. The laptop gatew
 |---|---|---|
 | DHT11 | Shipment environment | Temperature and humidity |
 | MPU6050 | Motion, tilt and shock | Accelerometer axes, gyroscope axes, shock flag, pitch and roll |
-| LDR + 10 kΩ divider | Exposure/opening signal | Raw light ADC value and exposure state |
+| LDR + 10 kÎ© divider | Exposure/opening signal | Raw light ADC value and exposure state |
 | ATECC508A | Device-backed identity | ECDSA signature over the telemetry envelope |
 
 Each stored event carries an event ID, device ID, shipment code, sequence number, event timestamp, payload, SHA-256 chain reference, and signature-verification result.
@@ -47,17 +53,17 @@ Each stored event carries an event ID, device ID, shipment code, sequence number
 
 ## Prototype scope and production roadmap
 
-The accompanying project deck describes a future field deployment with RTC-backed timing, optional SD-card evidence storage, discovery across changing networks, and event-driven low-power operation. Those are **roadmap capabilities**, not claims about the current bench prototype.
+Future field deployments may add RTC-backed timing, SD-card evidence storage, network discovery and low-power operation. These remain roadmap capabilities.
 
 The current prototype has been exercised while battery-powered through Wi-Fi, the laptop gateway, the existing HTTPS API, PostgreSQL, and the Vercel dashboard. It still depends on a manually started laptop gateway, local enrollment/configuration, a reachable 2.4 GHz network, and a LAN address that may change. It uses an **ATECC508A**, not an ATECC608A, and does not yet provide RTC time, SD-card recovery, deep sleep, or production operations/monitoring.
 
 ## Repository layout
 
-- `firmware/tracksure_gateway` — ESP32-S3 firmware for the real device.
-- `gateway` — Wi-Fi/LAN receiver, local signature verifier, durable uploader, and status endpoint.
-- `Tamper_admin` — FastAPI backend, PostgreSQL model, API routes, and Admin dashboard.
-- `Tamper_user` — shipment-user dashboard.
-- `LIVE_GATEWAY_RUNBOOK.md` — flash, wiring, gateway, and production configuration instructions.
+- `firmware/tracksure_gateway` â€” ESP32-S3 firmware for the real device.
+- `gateway` â€” Wi-Fi/LAN receiver, local signature verifier, durable uploader, and status endpoint.
+- `Tamper_admin` â€” FastAPI backend, PostgreSQL model, API routes, and Admin dashboard.
+- `Tamper_user` â€” shipment-user dashboard.
+- `LIVE_GATEWAY_RUNBOOK.md` â€” flash, wiring, gateway, and production configuration instructions.
 
 ## Quick start with real hardware
 
@@ -78,7 +84,7 @@ For a dashboard-only local demo and its demo accounts, see [Tamper_admin/README.
 ## Hardware notes and limits
 
 - Connect the ATECC508A and MPU6050 to the shared I2C bus: SDA GPIO 8 and SCL GPIO 9.
-- The LDR requires a divider: `3V3 -> 10 kΩ resistor -> GPIO 4 -> LDR -> GND`. A missing resistor leaves GPIO 4 floating, so its readings are undefined.
+- The LDR requires a divider: `3V3 -> 10 kÎ© resistor -> GPIO 4 -> LDR -> GND`. A missing resistor leaves GPIO 4 floating, so its readings are undefined.
 - MPU6050 pitch and roll are gravity-derived and stable at rest. A magnetometer is required for absolute yaw; the dashboard therefore holds yaw stable.
 - Device timestamps in this bench setup come from the ESP32 uptime and gateway/backend timing. The proposed RTC synchronisation is a future field-device addition.
 
@@ -90,10 +96,10 @@ Next production steps include a stable gateway discovery/address strategy, batte
 
 ## Research and standards
 
-- [NIST FIPS 180-4 — Secure Hash Standard](https://csrc.nist.gov/pubs/fips/180-4/upd1/final) for SHA-256.
+- [NIST FIPS 180-4 â€” Secure Hash Standard](https://csrc.nist.gov/pubs/fips/180-4/upd1/final) for SHA-256.
 - [Espressif ESP32-S3 documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/) for the device platform.
 - [Microchip CryptoAuthentication devices](https://www.microchip.com/en-us/products/security-ics/cryptoauthentication) for secure-element integration.
-- [NXP UM10204 — I2C-bus specification](https://www.nxp.com/docs/en/user-guide/UM10204.pdf) for shared sensor-bus design.
+- [NXP UM10204 â€” I2C-bus specification](https://www.nxp.com/docs/en/user-guide/UM10204.pdf) for shared sensor-bus design.
 
 ## Security and repository hygiene
 
@@ -102,3 +108,7 @@ The repository excludes local gateway configuration, device keys, database files
 ## License
 
 This repository is a project prototype. Add an explicit license before redistributing it outside the team.
+
+## Deployment and validation
+
+See [Deployment guide](docs/DEPLOYMENT.md), [release notes](docs/RELEASE_NOTES.md), and [shared portal architecture](Tamper_admin/frontend/SHARED_PORTAL.md).
