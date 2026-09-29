@@ -130,8 +130,8 @@ def startup_db_seed():
         for username, email, password, role, assignments in demo_users:
             existing = db.query(User).filter(User.username == username).first()
             if not existing and password:
-                if not 12 <= len(password) <= 72 or len(password.encode("utf-8")) > 72:
-                    raise RuntimeError("Bootstrap passwords must contain 12–72 UTF-8 bytes.")
+                if not 7 <= len(password) <= 72 or len(password.encode("utf-8")) > 72:
+                    raise RuntimeError("Bootstrap passwords must contain 7–72 characters and at most 72 UTF-8 bytes.")
                 db.add(User(username=username, email=email, hashed_password=get_password_hash(password), role=role, assigned_vehicles=json.dumps(assignments)))
             elif existing:
                 if existing.role not in ("admin", "user"):
