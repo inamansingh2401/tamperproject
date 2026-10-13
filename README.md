@@ -6,6 +6,8 @@ TrackSure is a shipment-security and condition-monitoring platform. It records e
 
 [Open SafeTrack](https://safetrack-portal.vercel.app). One login routes administrators to the operations console and assigned users to their shipment dashboard. Request an account from the project operator; production credentials are not published.
 
+**Service status — 13 October 2026:** login is currently unavailable. The Vercel API returns HTTP 500 during database startup after the Render free PostgreSQL instance expired on 12 October and was suspended. Migration to Supabase PostgreSQL is pending; no production data has been migrated and the backend connection has not been changed. See [database recovery](docs/DEPLOYMENT.md#database-recovery-and-migration-status).
+
 The shared login includes the truck introduction, optional sound replay, and a reduced-motion fallback. The user portal separates Overview, Conditions and Events; Conditions includes the sensor-driven 3D parcel. The admin Vehicles page supports fleet search, filtering and vehicle detail navigation.
 
 ## Why it exists

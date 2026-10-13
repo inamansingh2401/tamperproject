@@ -1142,9 +1142,12 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
     # - Exposing LDR to light (Light detected / container exposed) produces approx 100 ADC -> COMPROMISED
     # Threshold 2500 separates closed (> 2500) from exposed (< 2500).
     if data.ldr_raw is not None:
-        effective_light = float(data.ldr_raw)
-        light_unit = "ADC"
-        is_light_detected = (effective_light < 2500.0)
+        raw_light = float(data.ldr_raw)
+        # Relative brightness: keep the established 2500 ADC exposure boundary
+        # aligned with the dashboard threshold of 800. This is not calibrated lux.
+        effective_light = (4095.0 - raw_light) * SEAL_TAMPER_LUX_THRESHOLD / (4095.0 - 2500.0)
+        light_unit = "RELATIVE"
+        is_light_detected = (raw_light < 2500.0)
     elif data.light_lux is not None:
         effective_light = float(data.light_lux)
         light_unit = "LUX"

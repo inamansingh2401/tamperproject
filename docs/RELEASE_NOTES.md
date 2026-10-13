@@ -1,4 +1,12 @@
-# Release notes — 28 September 2026
+# Release notes
+
+## 13 October 2026 — LDR interpretation and database incident
+
+- Raw LDR ADC readings now map to increasing relative brightness while retaining the existing exposure boundary at 2500 ADC. The stored brightness is not calibrated lux.
+- Added a regression check for dark/exposed polarity, seal state, and the live API's returned brightness. Eight security tests pass against an isolated temporary database.
+- Production login is currently unavailable because the expired Render PostgreSQL instance is suspended and backend startup cannot connect. Supabase migration is pending; no database cutover has occurred.
+
+## 28 September 2026
 
 ## Unified portal
 

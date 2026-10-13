@@ -20,6 +20,14 @@ Deploy `Tamper_admin/backend` using its existing Vercel configuration. Set `DATA
 
 Follow `LIVE_GATEWAY_RUNBOOK.md`. Configure private hotspot credentials, device enrollment and the gateway LAN address locally. Firmware sends signed readings to the gateway; the gateway verifies, queues and forwards them to the API. A second laptop can run the gateway on the same LAN. The web portal does not require USB, but fresh readings require the hardware, network and gateway.
 
+## Database recovery and migration status
+
+As of 13 October 2026, the Render free PostgreSQL database is suspended after expiring on 12 October. The Vercel backend fails to connect during startup, and login returns HTTP 500. Supabase PostgreSQL has been selected as the replacement, but migration and the production `DATABASE_URL` change are not complete.
+
+Preserve the suspended database and existing gateway outbox. Export the current PostgreSQL data if Render recovery becomes available; do not assume an expired database can be queried. Historical local SQLite snapshots exist, but the inspected snapshot's latest sensor event is 4 September 2026, so restoring it would omit newer history. The existing `backend/migrate_sqlite_to_postgres.py` supports copying SQLite into an empty PostgreSQL target; do not use `--replace` against existing data without reviewing the target.
+
+Use a private TLS-enabled PostgreSQL connection string for the replacement. Keep existing JWT/device secrets and authorization behavior. Protect application tables from Supabase's public Data API; dashboards continue to use the existing FastAPI API. Redeploy the existing backend after updating its environment, then verify admin/user login, shipment access, live readings, and ledger history before declaring recovery complete. Supabase Free has storage and inactivity limits, so it is not an uptime guarantee.
+
 ## Release checks
 
 1. Build the frontend and run `python -m unittest discover -s tests -p test_security.py` in an isolated environment with backend dependencies installed.

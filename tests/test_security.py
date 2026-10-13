@@ -75,6 +75,18 @@ class SecurityTests(unittest.TestCase):
         conflict = self.client.post("/api/events", json={**payload, "device_id": "ESP32-S3-TRACKER-02"}, headers=headers)
         self.assertEqual(conflict.status_code, 409)
 
+    def test_ldr_dark_and_exposed_polarity(self):
+        headers = {"x-device-key": os.environ["DEVICE_API_KEY"]}
+        for raw, exposed in [(4095, False), (3900, False), (127, True), (0, True), (4095, False)]:
+            response = self.client.post("/api/events", json={**self.payload(), "ldr_raw": raw}, headers=headers)
+            self.assertEqual(response.status_code, 200)
+            value = response.json()
+            self.assertEqual(value["is_light_detected"], exposed)
+            self.assertEqual(value["seal_status"], "COMPROMISED" if exposed else "INTACT")
+            self.assertEqual(value["effective_light"] > 800, exposed)
+            live = self.client.get("/api/shipments/PRCL-2024-05-21-001/live", headers=self.user_headers).json()
+            self.assertAlmostEqual(live["latest_telemetry"]["light_lux"], value["effective_light"])
+
     def test_cors_allows_only_configured_origin(self):
         headers = {"Origin": "https://untrusted.example", "Access-Control-Request-Method": "GET"}
         response = self.client.options("/api/shipments", headers=headers)
