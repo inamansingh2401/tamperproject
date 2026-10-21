@@ -38,7 +38,7 @@ jobs:
           node tests/test_evidence.cjs
           node tests/test_ui_state.cjs
           node tests/test_reports.cjs
-      - run: npm ci
+      - run: npx --yes pnpm@11.25.0 install --frozen-lockfile --ignore-scripts
         working-directory: Tamper_admin/frontend
       - run: npm run build
         working-directory: Tamper_admin/frontend
