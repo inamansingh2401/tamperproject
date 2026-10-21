@@ -3,17 +3,19 @@ import json
 import math
 import os
 import hmac
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import inspect, text
+from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import Session
 
 from database import Base, SessionLocal, engine, get_db
 from models import Device, SensorEvent, Shipment, ShipmentAlert, SystemSetting, User, Vehicle
 from auth import create_access_token, decode_access_token, get_password_hash, verify_password
 from auth import IS_PRODUCTION
+from evidence import canonical, public_point, verify_envelope, make_evidence, export_record, verify_record
 
 # Initialize FastAPI App
 app = FastAPI(title="SafeTrack Unified Admin & Operations API", version="3.0.0")
@@ -71,13 +73,24 @@ def ensure_schema_migrations():
                 "shock_g": "FLOAT DEFAULT 0.0",
                 "pitch": "FLOAT DEFAULT 0.0",
                 "roll": "FLOAT DEFAULT 0.0",
+                "evidence_version": "INTEGER",
+                "evidence_payload": "TEXT",
+                "signed_envelope": "TEXT",
+                "public_key": "TEXT",
+                "signature_verified": "BOOLEAN",
+                "received_at": "TIMESTAMP",
             }
             for col_name, col_def in new_cols.items():
                 if col_name not in existing_cols:
                     conn.execute(text(f"ALTER TABLE sensor_events ADD COLUMN {col_name} {col_def}"))
             conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_sensor_events_event_id ON sensor_events (event_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_events_shipment_time ON sensor_events (shipment_id, created_at, id)"))
+            device_cols = {column['name'] for column in inspect(conn).get_columns('devices')}
+            for name, definition in {'shipment_code': 'VARCHAR(64)', 'public_key': 'TEXT'}.items():
+                if name not in device_cols:
+                    conn.execute(text(f'ALTER TABLE devices ADD COLUMN {name} {definition}'))
     except Exception as exc:
-        print(f"[SCHEMA MIGRATION NOTE] {exc}")
+        raise RuntimeError('Schema migration failed; restore/review deployment before serving requests') from None
 
 ensure_schema_migrations()
 
@@ -157,8 +170,7 @@ def startup_db_seed():
             existing_vehicle = db.query(Vehicle).filter(Vehicle.vehicle_code == v["vehicle_code"]).first()
             if not existing_vehicle:
                 db.add(Vehicle(**v))
-            else:
-                existing_vehicle.assigned_shipments = v["assigned_shipments"]
+            # Existing operational assignments must never be replaced by demo seeds.
 
         # Seed Default Shipments
         initial_shipments = [
@@ -260,6 +272,9 @@ class GPSSensorIngestPayload(BaseModel):
     humidity: float = Field(ge=0, le=100)
     warehouse_location: str = Field(default="Rewari Transit Hub, HR", max_length=128)
     device_key: Optional[str] = None
+    signed_envelope: Optional[dict] = None
+    gateway_received_at: Optional[datetime] = None
+    captured_at_ms: Optional[int] = Field(default=None, ge=1700000000000, le=4102444800000)
 
     # Flexible Light Ingest (supports both lux and raw ADC readings)
     light_lux: Optional[float] = None
@@ -291,6 +306,12 @@ class VehicleUpdatePayload(BaseModel):
     destination: Optional[str] = None
     current_hub: Optional[str] = None
     status: Optional[str] = None
+
+
+class DeviceAssignmentPayload(BaseModel):
+    shipment_code: str = Field(min_length=1, max_length=64, pattern=r'^[A-Za-z0-9_.:-]+$')
+    public_key: str = Field(min_length=128, max_length=130, pattern=r'^[a-fA-F0-9]+$')
+    confirm_drained: bool = False
 
 
 class VehicleAssignShipmentPayload(BaseModel):
@@ -385,6 +406,66 @@ def require_admin(current_user: User = Depends(get_current_user)):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+
+
+@app.get('/api/devices')
+def list_devices(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    return [{'device_id': d.device_id, 'status': d.status, 'shipment_code': d.shipment_code,
+             'signature_enrolled': bool(d.public_key)} for d in db.query(Device).order_by(Device.device_id)]
+
+
+@app.put('/api/devices/{device_id}/assignment')
+def bind_device(device_id: str, payload: DeviceAssignmentPayload, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    device = db.query(Device).filter(Device.device_id == device_id, Device.status == 'active').with_for_update().first()
+    if not device:
+        raise HTTPException(404, 'Active device not found')
+    if not db.query(Shipment).filter(Shipment.shipment_code == payload.shipment_code).first():
+        raise HTTPException(404, 'Shipment not found')
+    try:
+        _, point = public_point(payload.public_key)
+    except Exception:
+        raise HTTPException(422, 'Invalid P-256 public key')
+    if device.public_key and device.public_key != point:
+        raise HTTPException(409, 'Key rotation requires a separate reviewed enrollment')
+    if device.shipment_code and device.shipment_code != payload.shipment_code and not payload.confirm_drained:
+        raise HTTPException(409, 'Pause sampling and drain device/gateway queues before reassignment')
+    device.shipment_code = payload.shipment_code
+    device.public_key = point
+    db.commit()
+    return {'status': 'success', 'device_id': device.device_id, 'shipment_code': device.shipment_code,
+            'signature_enrolled': True, 'requires_matching_firmware_and_gateway_assignment': True}
+
+
+@app.get('/api/shipments/{code}/evidence')
+def shipment_evidence(code: str, after_id: int = 0, limit: int = 500, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    shipment = db.query(Shipment).filter(Shipment.shipment_code == code).first()
+    if not shipment:
+        raise HTTPException(404, 'Shipment not found')
+    if current_user.role != 'admin':
+        try:
+            assignments = json.loads(current_user.assigned_vehicles or '[]')
+        except (TypeError, ValueError):
+            assignments = []
+        if code not in assignments:
+            raise HTTPException(403, 'Shipment not assigned to this user')
+    if after_id < 0 or not 1 <= limit <= 500:
+        raise HTTPException(422, 'Use a nonnegative cursor and limit 1-500')
+    anchor = db.query(SensorEvent).filter(SensorEvent.shipment_id == shipment.id, SensorEvent.id <= after_id).order_by(SensorEvent.id.desc()).first()
+    events = db.query(SensorEvent).filter(SensorEvent.shipment_id == shipment.id, SensorEvent.id > after_id).order_by(SensorEvent.id).limit(limit + 1).all()
+    more = len(events) > limit
+    events = events[:limit]
+    previous = anchor.record_hash if anchor else '0' * 64
+    results = []
+    records = []
+    for event in events:
+        record = export_record(event)
+        results.append(verify_record(record, previous, code))
+        records.append(record)
+        previous = event.record_hash
+    return {'shipment_code': code, 'anchor_previous_hash': anchor.record_hash if anchor else '0' * 64,
+            'records': records, 'verification': results, 'has_more': more,
+            'next_after_id': events[-1].id if events else after_id,
+            'limitations': 'Hashes and device signatures only; no external anchor. Legacy records may lack signatures.'}
 
 
 @app.get("/api/admin/dashboard")
@@ -621,6 +702,23 @@ def get_shipments(db: Session = Depends(get_db), current_user: User = Depends(re
     return result
 
 
+def telemetry_context(event):
+    if not event.evidence_payload:
+        return {'light_unit':'UNKNOWN','captured_at':None,'time_quality':'legacy_unknown'}
+    try:
+        proof = json.loads(event.evidence_payload)
+        source = proof.get('source', {})
+        if not isinstance(proof, dict) or not isinstance(source, dict):
+            raise ValueError('Invalid evidence context')
+    except (TypeError, ValueError, AttributeError):
+        return {'light_unit':'UNKNOWN','captured_at':None,'time_quality':'invalid_evidence'}
+    capture = source.get('captured_at_ms')
+    return {**proof.get('context', {}),
+            'light_unit':'RELATIVE' if source.get('ldr_raw') is not None else 'LUX' if source.get('light_lux') is not None else 'UNKNOWN',
+            'captured_at':datetime.fromtimestamp(capture/1000,timezone.utc).isoformat() if capture else None,
+            'time_quality':'device_sntp' if capture else 'gateway_receipt'}
+
+
 @app.get("/api/shipments/{code}")
 def get_shipment_by_code(
     code: str,
@@ -652,7 +750,7 @@ def get_shipment_by_code(
     recent_events = (
         db.query(SensorEvent)
         .filter(SensorEvent.shipment_id == shipment.id)
-        .order_by(SensorEvent.id.desc())
+        .order_by(SensorEvent.created_at.desc(), SensorEvent.id.desc())
         .limit(30)
         .all()
     )
@@ -674,7 +772,7 @@ def get_shipment_by_code(
             "light_lux": float(event.light_lux or 0),
             "temperature": float(event.temperature or 0),
             "humidity": float(event.humidity or 0),
-            "light_unit": "LUX",
+            **telemetry_context(event),
             "accel_g": float(event.accel_g or 0),
             "gyro_dps": float(event.gyro_dps or 0),
             "accel_x": float(event.accel_x) if event.accel_x is not None and event.mpu_read_ok is not False else None,
@@ -692,6 +790,7 @@ def get_shipment_by_code(
             "health_level": event.health_level or "Optimal",
             "previous_hash": event.previous_hash,
             "record_hash": event.record_hash,
+            "verification": verify_record(export_record(event), expected_shipment=code),
             "created_at": (
                 event.created_at.isoformat()
                 if event.created_at
@@ -734,7 +833,8 @@ def get_shipment_by_code(
             "current_warehouse": shipment.current_warehouse,
             "status": shipment.status,
             "seal_status": shipment.seal_status,
-            "health_level": shipment.health_level
+            "health_level": shipment.health_level,
+            "bound_device_ids": [d.device_id for d in db.query(Device).filter(Device.shipment_code == code, Device.status == 'active')]
         },
         "latest_telemetry": latest,
         "events": events_data,
@@ -763,7 +863,7 @@ def get_shipment_live(
     event = (
         db.query(SensorEvent)
         .filter(SensorEvent.shipment_id == shipment.id)
-        .order_by(SensorEvent.id.desc())
+        .order_by(SensorEvent.created_at.desc(), SensorEvent.id.desc())
         .first()
     )
     latest = None
@@ -773,6 +873,7 @@ def get_shipment_live(
             "event_id": event.event_id,
             "device_id": event.device_id,
             "temperature": float(event.temperature) if event.temperature is not None else None,
+            **telemetry_context(event),
             "humidity": float(event.humidity) if event.humidity is not None else None,
             "light_lux": float(event.light_lux) if event.light_lux is not None else None,
             "accel_g": float(event.accel_g) if event.accel_g is not None else None,
@@ -1110,6 +1211,12 @@ def get_reports_summary(db: Session = Depends(get_db), current_user: User = Depe
     temp_alerts = len([a for a in alerts if "temp" in a.alert_type.lower()])
     tamper_alerts = len([a for a in alerts if "tamper" in a.alert_type.lower() or "seal" in a.alert_type.lower()])
     shock_alerts = len([a for a in alerts if "shock" in a.alert_type.lower() or "impact" in a.alert_type.lower()])
+    valid_temperature_count = db.query(func.count(SensorEvent.id)).filter(SensorEvent.temperature.isnot(None)).scalar()
+    in_range_count = db.query(func.count(SensorEvent.id)).filter(SensorEvent.temperature.between(2.0,8.0)).scalar()
+    shipment_statuses = [{'status': status, 'count': count} for status,count in
+                         db.query(Shipment.status,func.count(Shipment.id)).group_by(Shipment.status).order_by(Shipment.status)]
+    vehicle_statuses = [{'status': status, 'count': count} for status,count in
+                        db.query(Vehicle.status,func.count(Vehicle.id)).group_by(Vehicle.status).order_by(Vehicle.status)]
 
     return {
         "total_shipments": total_shipments,
@@ -1117,7 +1224,14 @@ def get_reports_summary(db: Session = Depends(get_db), current_user: User = Depe
         "total_events": total_events,
         "total_alerts": len(alerts),
         "active_alerts_count": len(active_alerts),
-        "compliance_percentage": 96.8,
+        "compliance_percentage": round(100*in_range_count/valid_temperature_count,2) if valid_temperature_count else None,
+        "temperature_readings": valid_temperature_count,
+        "temperature_in_range": in_range_count,
+        "temperature_reference_c": [2.0,8.0],
+        "report_scope": "all stored history; reference range, not shipment-specific compliance certification",
+        "shipment_statuses": shipment_statuses,
+        "vehicle_statuses": vehicle_statuses,
+        "on_time_delivery_percentage": None,  # No planned/actual delivery timestamps exist.
         "temp_alerts": temp_alerts,
         "tamper_alerts": tamper_alerts,
         "shock_alerts": shock_alerts
@@ -1198,9 +1312,9 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
     # LIVE PRINT STATEMENT FOR TERMINAL LOGGING (Real Hardware Inspection)
     print(f"\n [ESP32 LIVE READINGS] Device: {data.device_id} | Shipment: {data.shipment_code} | Temp: {data.temperature}°C | Humidity: {data.humidity}% | Light: {effective_light:.0f} {light_unit} ({'LIGHT DETECTED' if is_light_detected else 'NO LIGHT'}) | Accel: {effective_accel}g (X={ax}, Y={ay}, Z={az}) | Gyro: {effective_gyro}°/s | Pitch: {pitch_deg}° | Roll: {roll_deg}° | Shock: {is_shock}\n")
 
-    device = db.query(Device).filter(Device.device_id == data.device_id, Device.status == "active").first()
+    device = db.query(Device).filter(Device.device_id == data.device_id, Device.status == "active").with_for_update().first()
     if not device:
-        device = db.query(Device).filter(Device.device_id.ilike(data.device_id.strip()), Device.status == "active").first()
+        device = db.query(Device).filter(Device.device_id.ilike(data.device_id.strip()), Device.status == "active").with_for_update().first()
     if not device:
         print(f"[AUTH ERROR] Device '{data.device_id}' not found in active devices table!")
         raise HTTPException(status_code=401, detail=f"Unknown or inactive device: {data.device_id}")
@@ -1225,24 +1339,65 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
         print(f"[AUTH ERROR] Invalid key for device {data.device_id}")
         raise HTTPException(status_code=401, detail="Invalid device key")
 
+    source = data.model_dump(mode='json', exclude={'signed_envelope', 'gateway_received_at', 'device_key'})
+    ingest_digest = hashlib.sha256(canonical(source).encode()).hexdigest()
+    signature_verified = None
+    if data.signed_envelope:
+        try:
+            signed = verify_envelope(data.signed_envelope, device.public_key)
+            # Reject extra unsigned sensor overrides as well as altered signed fields.
+            if any(name in signed for name in ('signed_envelope', 'gateway_received_at', 'device_key')):
+                raise ValueError('Reserved signed field')
+            normalized_signed = GPSSensorIngestPayload.model_validate(signed).model_dump(mode='json', exclude={'signed_envelope', 'gateway_received_at', 'device_key'})
+            if normalized_signed != source:
+                raise ValueError('Signed payload differs from upload')
+            source = signed
+            signature_verified = True if device.public_key else None
+        except Exception:
+            raise HTTPException(422, 'Invalid signature or signed readings mismatch')
+    elif device.public_key:
+        raise HTTPException(422, 'Enrolled device requires its signed envelope')
+
     if data.event_id:
+        idempotency_key = request.headers.get('Idempotency-Key')
+        if idempotency_key and idempotency_key != data.event_id:
+            raise HTTPException(409, 'Idempotency key must match the signed event ID')
         previous_event = db.query(SensorEvent).filter(SensorEvent.event_id == data.event_id).first()
         if previous_event:
             if previous_event.device_id != device.device_id:
                 raise HTTPException(status_code=409, detail="Event identity already in use")
+            original_shipment = db.get(Shipment, previous_event.shipment_id)
+            if not original_shipment or original_shipment.shipment_code != data.shipment_code:
+                raise HTTPException(409, 'Event identity belongs to a different shipment')
+            if previous_event.evidence_payload and json.loads(previous_event.evidence_payload).get('ingest_digest') != ingest_digest:
+                raise HTTPException(409, 'Event identity conflict: readings changed')
             return {
                 "status": "success",
+                "event_id": data.event_id,
                 "duplicate": True,
                 "event_hash": previous_event.record_hash,
                 "health_level": previous_event.health_level,
             }
 
-    shipment = db.query(Shipment).filter(Shipment.shipment_code == data.shipment_code).first()
+    if device.shipment_code and device.shipment_code != data.shipment_code:
+        raise HTTPException(403, 'Device is assigned to a different shipment')
+    shipment = db.query(Shipment).filter(Shipment.shipment_code == data.shipment_code).with_for_update().first()
     if not shipment:
         raise HTTPException(status_code=404, detail="Shipment not found")
 
+    received_at = datetime.now(timezone.utc)
+    observed_at = datetime.fromtimestamp(data.captured_at_ms / 1000, timezone.utc) if data.captured_at_ms is not None and data.signed_envelope else data.gateway_received_at or received_at
+    if observed_at.tzinfo is None:
+        observed_at = observed_at.replace(tzinfo=timezone.utc)
+    observed_at = observed_at.astimezone(timezone.utc)
+    if observed_at > received_at + timedelta(minutes=5):
+        raise HTTPException(422, 'Capture/gateway clock is in the future')
+    observed_at = observed_at.replace(tzinfo=None)
+    current_latest = db.query(SensorEvent).filter(SensorEvent.shipment_id == shipment.id).order_by(SensorEvent.created_at.desc(), SensorEvent.id.desc()).first()
+    is_stale = current_latest is not None and observed_at < current_latest.created_at
+
     # Dynamic recalculation of seal_status (strictly non-latching, reflects current physical state)
-    if is_light_detected:
+    if not is_stale and is_light_detected:
         shipment.seal_status = "COMPROMISED"
         add_active_alert_once(
             db,
@@ -1253,7 +1408,7 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
             data.warehouse_location,
             f"CRITICAL TAMPER: Container exposed to light ({effective_light:.0f} {light_unit}) at {data.warehouse_location}!"
         )
-    else:
+    elif not is_stale:
         shipment.seal_status = "INTACT"
         # If light is removed / container closed, mark active seal breach alerts as Resolved without deleting historical records
         active_seal_alerts = db.query(ShipmentAlert).filter(
@@ -1267,7 +1422,7 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
     # Dynamic health evaluation based on CURRENT state
     if is_light_detected or data.temperature > 15.0 or is_shock:
         calculated_health = "Compromised"
-        if data.temperature > 15.0 or is_shock:
+        if not is_stale and (data.temperature > 15.0 or is_shock):
             shock_msg = f"Severe impact ({effective_accel}g)" if is_shock else ""
             temp_msg = f"heat ({data.temperature}°C)" if data.temperature > 15.0 else ""
             reason = " and ".join(filter(None, [shock_msg, temp_msg]))
@@ -1277,17 +1432,16 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
     else:
         calculated_health = "Optimal"
 
-    shipment.health_level = calculated_health
-    shipment.latest_temperature = data.temperature
-    shipment.latest_light = effective_light
-    shipment.latest_humidity = data.humidity
-    shipment.current_warehouse = data.warehouse_location
-    shipment.latest_shock = f"Impact ({effective_accel}g)" if effective_accel >= 2.5 else f"Normal ({effective_accel}g)"
+    if not is_stale:
+        shipment.health_level = calculated_health
+        shipment.latest_temperature = data.temperature
+        shipment.latest_light = effective_light
+        shipment.latest_humidity = data.humidity
+        shipment.current_warehouse = data.warehouse_location
+        shipment.latest_shock = f"Impact ({effective_accel}g)" if effective_accel >= 2.5 else f"Normal ({effective_accel}g)"
 
     last_event = db.query(SensorEvent).filter(SensorEvent.shipment_id == shipment.id).order_by(SensorEvent.id.desc()).first()
     prev_hash = last_event.record_hash if last_event else "0" * 64
-    payload_str = f"{shipment.id}|{data.device_id}|{effective_light}|{data.temperature}|{data.humidity}|{effective_accel}|{prev_hash}"
-    curr_hash = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
 
     event = SensorEvent(
         orientation_q=json.dumps(data.orientation_q) if data.orientation_q and data.mpu_read_ok is not False else None,
@@ -1311,12 +1465,27 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
         roll=roll_deg,
         health_level=calculated_health,
         previous_hash=prev_hash,
-        record_hash=curr_hash
+        record_hash='',
+        evidence_version=2,
+        signed_envelope=canonical(data.signed_envelope) if data.signed_envelope else None,
+        public_key=device.public_key,
+        signature_verified=signature_verified,
+        created_at=observed_at,
+        received_at=received_at.replace(tzinfo=None),
     )
+    # Apply ORM defaults before hashing so stored values match the evidence.
     db.add(event)
+    db.flush()
+    event.evidence_payload = make_evidence(event, source, ingest_digest, {
+        'gateway_received_at':data.gateway_received_at.isoformat() if data.gateway_received_at else None,
+        'backend_received_at':received_at.isoformat(), 'light_unit':light_unit,
+    })
+    curr_hash = hashlib.sha256(event.evidence_payload.encode('utf-8')).hexdigest()
+    event.record_hash = curr_hash
     db.commit()
     return {
         "status": "success",
+        "event_id": data.event_id,
         "health_level": calculated_health,
         "seal_status": shipment.seal_status,
         "event_hash": curr_hash,

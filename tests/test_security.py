@@ -9,7 +9,20 @@ import tempfile
 import unittest
 
 scratch = tempfile.TemporaryDirectory(prefix="tracksure-security-")
-os.environ["DATABASE_URL"] = "sqlite:///" + (Path(scratch.name) / "test.db").as_posix()
+test_url = os.getenv('SAFETRACK_TEST_DATABASE_URL')
+if test_url:
+    from sqlalchemy import create_engine, inspect
+    from sqlalchemy.engine import make_url
+    url = make_url(test_url)
+    if url.drivername != 'postgresql+psycopg' or url.host not in ('127.0.0.1','localhost') or url.database != 'safetrack_test':
+        raise RuntimeError('Tests require a fresh loopback PostgreSQL safetrack_test database')
+    probe = create_engine(url)
+    try:
+        if inspect(probe).get_table_names():
+            raise RuntimeError('Refusing to run tests against a non-empty database')
+    finally:
+        probe.dispose()
+os.environ["DATABASE_URL"] = test_url or "sqlite:///" + (Path(scratch.name) / "test.db").as_posix()
 os.environ["SAFETRACK_ENV"] = "production"
 os.environ["JWT_SECRET"] = secrets.token_urlsafe(48)
 os.environ["DEVICE_API_KEY"] = secrets.token_urlsafe(48)

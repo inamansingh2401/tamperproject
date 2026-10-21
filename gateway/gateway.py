@@ -7,6 +7,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import math
 import sqlite3
+import shutil
 import threading
 import time
 from contextlib import contextmanager
@@ -125,14 +126,12 @@ class Outbox:
             # Lease atomically: parallel uploaders must never select the same row.
             db.execute('BEGIN IMMEDIATE')
             now = time.time()
-            row = db.execute("SELECT rowid AS ordinal,* FROM outbox WHERE state='queued' ORDER BY rowid DESC LIMIT 1").fetchone()
+            row = db.execute("SELECT rowid AS ordinal,* FROM outbox WHERE state='queued' ORDER BY rowid ASC LIMIT 1").fetchone()
             if row and row['next_attempt'] > now:
                 return None
             if row:
-                # Preserve exact signed history locally, but never replay stale
-                # samples over the current cloud display. This gateway is enrolled
-                # to one device/shipment (validated by decode_record).
-                db.execute("UPDATE outbox SET state='archived',error='Superseded for live delivery; signed original retained locally' WHERE state='queued' AND rowid<?", (row['ordinal'],))
+                # Deliver every queued event in receive order. Previously archived
+                # history is retained untouched; recovery is a separate operation.
                 db.execute('UPDATE outbox SET next_attempt=? WHERE event_id=?', (now + 120, row['event_id']))
             return row
 
@@ -145,7 +144,22 @@ class Outbox:
         with self.connect() as db:
             counts = {row['state']: row['n'] for row in db.execute('SELECT state,COUNT(*) n FROM outbox GROUP BY state')}
             row = db.execute('SELECT event_id,payload,verified,state,error,received,sent FROM outbox ORDER BY rowid DESC LIMIT 1').fetchone()
-        return {'counts': counts, 'latest': dict(row) if row else None}
+            oldest = db.execute("SELECT received FROM outbox WHERE state='queued' ORDER BY rowid LIMIT 1").fetchone()
+            last_verified = db.execute('SELECT received FROM outbox WHERE verified=1 ORDER BY rowid DESC LIMIT 1').fetchone()
+            last_sent = db.execute("SELECT sent FROM outbox WHERE state='sent' ORDER BY sent DESC LIMIT 1").fetchone()
+        def age(value):
+            try:
+                stamp = datetime.fromisoformat(value)
+                if stamp.tzinfo is None:
+                    stamp = stamp.replace(tzinfo=timezone.utc)
+                return max(0, round((datetime.now(timezone.utc)-stamp).total_seconds(), 1))
+            except (ValueError, TypeError):
+                return None
+        return {'counts': counts, 'latest': dict(row) if row else None,
+                'oldest_queued_age_seconds': age(oldest['received']) if oldest else None,
+                'last_verified_receipt_age_seconds': age(last_verified['received']) if last_verified else None,
+                'last_cloud_ack_age_seconds': age(last_sent['sent']) if last_sent else None,
+                'free_disk_bytes': shutil.disk_usage(Path(self.path).resolve().parent).free}
 
 
 def send_one(outbox, config, client):
@@ -153,12 +167,17 @@ def send_one(outbox, config, client):
     if not row:
         return False
     try:
+        payload = json.loads(row['payload'])
+        payload['gateway_received_at'] = row['received']
+        if row['verified']:
+            # Preserve original signed bytes for independent cloud verification.
+            payload['signed_envelope'] = strict_json(row['original'])
         response = client.post(config['cloud_url'].rstrip('/') + '/api/events',
-            content=row['payload'], headers={'Content-Type': 'application/json',
+            json=payload, headers={'Content-Type': 'application/json',
             'x-device-key': config['device_key'], 'Idempotency-Key': row['event_id']})
         if 200 <= response.status_code < 300:
             result = response.json()
-            if result.get('status') != 'success':
+            if result.get('status') != 'success' or result.get('event_id', row['event_id']) != row['event_id']:
                 raise ValueError('Cloud returned an unexpected acknowledgment')
             outbox.mark(row['event_id'], 'sent')
             LOG.info('Cloud stored %s (signature %s)', row['event_id'], 'verified locally' if row['verified'] else 'not configured')
@@ -173,21 +192,12 @@ def send_one(outbox, config, client):
 
 
 def upload_loop(outbox, config):
-    # Multiple workers let the durable outbox catch up when API/database
-    # latency is higher than the ESP sampling interval. Every row is still
-    # retained and acknowledged independently, so no telemetry is discarded.
-    def worker():
-        with httpx.Client(timeout=httpx.Timeout(65, connect=15), verify=True, follow_redirects=False) as client:
-            while not STOP.is_set():
-                if not send_one(outbox, config, client):
-                    STOP.wait(0.25)
-
     # One in-flight request preserves cloud ordering and the per-shipment chain.
-    workers = [threading.Thread(target=worker, name='cloud-live-upload', daemon=True)]
-    for thread in workers:
-        thread.start()
-    while not STOP.is_set():
-        STOP.wait(1)
+    # The status endpoint observes this actual worker, not a supervising thread.
+    with httpx.Client(timeout=httpx.Timeout(65, connect=15), verify=True, follow_redirects=False) as client:
+        while not STOP.is_set():
+            if not send_one(outbox, config, client):
+                STOP.wait(0.25)
 
 
 def main():
@@ -196,6 +206,7 @@ def main():
     parser.add_argument('--status-port', type=int, default=None)
     parser.add_argument('--bind', default=None, help='Listener address; defaults to lan_bind in local config')
     parser.add_argument('--outbox', default=str(ROOT/'gateway-outbox.db'))
+    parser.add_argument('--log-file', default=str(ROOT/'gateway-runtime.local.log'), help='Local runtime log; override for isolated tests')
     parser.add_argument('--local-only', action='store_true', help='Accept and persist device records without cloud upload')
     parser.add_argument('--max-wifi-ingest', type=int, default=None, help='Stop after this many successful Wi-Fi requests')
     args = parser.parse_args()
@@ -207,7 +218,7 @@ def main():
     if args.max_wifi_ingest is not None and args.max_wifi_ingest < 1:
         raise SystemExit('--max-wifi-ingest must be at least 1')
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-    file_log = RotatingFileHandler(ROOT / 'gateway-runtime.local.log', maxBytes=5_000_000,
+    file_log = RotatingFileHandler(Path(args.log_file), maxBytes=5_000_000,
                                    backupCount=3, encoding='utf-8')
     file_log.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
     LOG.addHandler(file_log)
@@ -216,6 +227,7 @@ def main():
     if bind not in ('0.0.0.0', '::'):
         local_status_clients.add(bind)
     accepted_wifi_requests = 0
+    uploader = None
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
             nonlocal accepted_wifi_requests
@@ -257,8 +269,11 @@ def main():
                 self.send_error(404)
                 return
             data = outbox.status()
-            data['signature_required'] = bool(config.get('require_signature'))
+            data['signature_required'] = True  # /ingest enforces this regardless of config.
             data['cloud_url'] = config['cloud_url']
+            data['cloud_upload_enabled'] = not args.local_only
+            data['cloud_worker_alive'] = bool(uploader and uploader.is_alive())
+            data['listener'] = {'bind': bind, 'port': status_port, 'path': '/ingest'}
             body = json.dumps(data, indent=2).encode()
             self.send_response(200)
             self.send_header('Content-Type','application/json')
@@ -269,11 +284,12 @@ def main():
             pass
     server = ThreadingHTTPServer((bind, status_port), Handler)
     if not args.local_only:
-        threading.Thread(target=upload_loop, args=(outbox, config), daemon=True).start()
+        uploader = threading.Thread(target=upload_loop, args=(outbox, config), daemon=True)
+        uploader.start()
     LOG.info('Gateway ready on %s:%s; signed Wi-Fi ingest POST /ingest.', bind, status_port)
     status_host = '127.0.0.1' if bind in ('0.0.0.0', '::') else bind
     LOG.info('Local status: http://%s:%s/status', status_host, status_port)
-    LOG.info('Signature enforcement: %s', bool(config.get('require_signature')))
+    LOG.info('Signature enforcement: enabled for all Wi-Fi /ingest requests')
     if args.local_only:
         LOG.info('Local-only mode: cloud upload disabled.')
     try:

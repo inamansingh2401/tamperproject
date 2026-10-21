@@ -13,7 +13,8 @@
   <link rel="stylesheet" href="dashboard.css">
   <script src="common.js"></script>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.js" integrity="sha384-LtmWBcrD5iuFIR4sFphS8IiiaftkypL5dJzLKywbyd9ATLB7ZbPz3JYnI9nvXHkV" crossorigin="anonymous"></script>
-  <script src="dashboard.js" defer></script>
+  <script src="evidence.js?v=20261013" defer></script>
+  <script src="dashboard.js?v=20261013-evidence" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#mainContent">Skip to shipment overview</a>
@@ -174,9 +175,9 @@
           </article>
           <article class="metric-card" data-metric="light">
             <div class="metric-head"><span class="metric-icon amber"><i data-lucide="sun-medium"></i></span><span id="lightState" class="metric-state">Waiting</span></div>
-            <p>Light exposure</p><div class="metric-reading"><strong id="lightValue">—</strong><span>lux</span></div>
+            <p>Light exposure</p><div class="metric-reading"><strong id="lightValue">—</strong><span id="lightUnit">unit unknown</span></div>
             <div class="range-track"><span id="lightMarker" class="range-marker"></span></div>
-            <small>Seal threshold 800 lux</small>
+            <small>Exposure threshold 800; raw LDR is relative brightness</small>
           </article>
           <article class="metric-card" data-metric="acceleration">
             <div class="metric-head"><span class="metric-icon violet"><i data-lucide="activity"></i></span><span id="accelerationState" class="metric-state">Waiting</span></div>
@@ -210,9 +211,14 @@
 
       <section data-dashboard-section="events" id="events" class="content-section events-section" aria-labelledby="eventsTitle">
         <div class="section-heading events-heading">
-          <div><p class="kicker">TAMPER-EVIDENT RECORD</p><h2 id="eventsTitle">Recent verified events</h2></div>
+          <div><p class="kicker">TAMPER-EVIDENT RECORD</p><h2 id="eventsTitle">Recent event evidence</h2></div>
           <div class="ledger-summary"><i data-lucide="link-2"></i><span><strong id="eventCount">0 events</strong><small>Newest record first</small></span></div>
         </div>
+        <div class="section-heading">
+          <button id="verifyEvidenceBtn" type="button" class="secondary-button">Verify evidence</button>
+          <button id="downloadEvidenceBtn" type="button" class="secondary-button" disabled>Download evidence</button>
+        </div>
+        <p id="evidenceResult" role="status">Not checked in this browser. Legacy events may lack signatures.</p>
         <div class="event-columns" aria-hidden="true"><span>Event</span><span>Reading</span><span>Recorded</span><span>Ledger hash</span><span>Verification</span></div>
         <div id="eventList" class="event-list" aria-live="polite">
           <div class="empty-state"><i data-lucide="loader-circle"></i><span><strong>Loading event ledger</strong><small>Retrieving the latest custody records…</small></span></div>

@@ -6,7 +6,7 @@ TrackSure is a shipment-security and condition-monitoring platform. It records e
 
 [Open SafeTrack](https://safetrack-portal.vercel.app). One login routes administrators to the operations console and assigned users to their shipment dashboard. Request an account from the project operator; production credentials are not published.
 
-**Service status — 13 October 2026:** login is currently unavailable. The Vercel API returns HTTP 500 during database startup after the Render free PostgreSQL instance expired on 12 October and was suspended. Migration to Supabase PostgreSQL is pending; no production data has been migrated and the backend connection has not been changed. See [database recovery](docs/DEPLOYMENT.md#database-recovery-and-migration-status).
+**Service status — 13 October 2026:** admin/user login and shipment APIs have been restored using Supabase PostgreSQL through its TLS session pooler. Recovery restored a historical SQLite snapshot (latest snapshot event: 4 September), plus one retained, previously verified gateway event for upload verification. The expired Render database remains suspended and untouched; recovery of newer cloud-only history is incomplete. See [database recovery](docs/DEPLOYMENT.md#database-recovery-and-migration-status).
 
 The shared login includes the truck introduction, optional sound replay, and a reduced-motion fallback. The user portal separates Overview, Conditions and Events; Conditions includes the sensor-driven 3D parcel. The admin Vehicles page supports fleet search, filtering and vehicle detail navigation.
 
@@ -43,7 +43,19 @@ The battery-powered firmware emits signed telemetry over Wi-Fi. The laptop gatew
 | LDR + 10 kÎ© divider | Exposure/opening signal | Raw light ADC value and exposure state |
 | ATECC508A | Device-backed identity | ECDSA signature over the telemetry envelope |
 
-Each stored event carries an event ID, device ID, shipment code, sequence number, event timestamp, payload, SHA-256 chain reference, and signature-verification result.
+New evidence-version-2 events retain the original signed envelope (including boot/sequence metadata), normalized readings, enrollment public key when configured, SHA-256 chain references, gateway receipt time and backend arrival time. Older records remain readable but may lack original signatures; a stored hash alone is not evidence of a valid device signature.
+
+### Reboot, reuse and evidence verification (local implementation, 14 October 2026)
+
+- The canonical firmware commits up to 512 signed events to LittleFS before Wi-Fi delivery. Ordinary reboot resumes pending events unchanged; only a matching gateway ACK removes a record. Shipment assignment and pause state persist in NVS. Full/corrupt storage does not overwrite old evidence; recording gaps are possible when capacity is exhausted.
+- The gateway now uploads every queued event in FIFO order and preserves the original envelope. Previously archived/blocked outbox records are not automatically replayed or changed. The backend keeps older gateway-receipt timestamps from replacing newer live telemetry.
+- Admin shipment inspection includes device/public-key enrollment against an exact shipment. Bound devices cannot upload to another shipment. Legacy unbound devices retain compatibility until explicitly enrolled; complete enrollment before relying on cloud-side signature enforcement.
+- Admin and user dashboards offer **Verify evidence** and a JSON export. The browser recomputes hashes, checks links, and verifies available P-256 signatures. `python Tamper_admin/backend/evidence.py <export.json>` verifies an export independently of the running API. Enrollment keys and chain anchors still need independent trust; this is not a blockchain or externally anchored ledger.
+- See the [reboot/reuse workflow](LIVE_GATEWAY_RUNBOOK.md#5-reboot-and-device-reuse) and [prioritized improvement backlog](docs/IMPROVEMENTS.md).
+
+Software validation: firmware compile with private Wi-Fi settings and without the private header, 20 Python regressions against isolated SQLite **and** disposable PostgreSQL (including real loopback HTTP `/ingest`, durable ACK and signature enforcement), WebCrypto/UI/report tests, frontend build and browser previews. The protected staged API passed real account login, shipment detail/live and evidence reads with 30 existing ledger records; the primary API alias has not been promoted. Additive evidence/device columns are present in Supabase; existing event count remains 15,334 and RLS remains enabled. Later report and timestamp-verifier changes are local, not part of that staged check. Firmware flashing and physical acceptance are **NOT TESTED / deferred at the operator's request** because the ESP32 is unavailable.
+
+Additional local changes normalize seal labels, display UTC consistently, distinguish relative LDR readings from calibrated lux, mark unavailable MPU readings, preserve operational vehicle assignments on startup, and calculate report figures from stored data instead of placeholders. User dashboard logic has one canonical source; the build synchronizes its bundled copy. Gateway status exposes delivery/queue ages, worker availability and disk headroom. Read-only outbox inspection and a private PostgreSQL backup/restore drill are available; neither replays/deletes production history. See the backlog for partial and still-pending work; this is not an all-improvements-complete release.
 
 ## Security model
 
@@ -88,7 +100,7 @@ For a dashboard-only local demo and its demo accounts, see [Tamper_admin/README.
 - Connect the ATECC508A and MPU6050 to the shared I2C bus: SDA GPIO 8 and SCL GPIO 9.
 - The LDR requires a divider: `3V3 -> 10 kÎ© resistor -> GPIO 4 -> LDR -> GND`. A missing resistor leaves GPIO 4 floating, so its readings are undefined.
 - MPU6050 pitch and roll are gravity-derived and stable at rest. A magnetometer is required for absolute yaw; the dashboard therefore holds yaw stable.
-- Device timestamps in this bench setup come from the ESP32 uptime and gateway/backend timing. The proposed RTC synchronisation is a future field-device addition.
+- New firmware signs UTC capture time after SNTP synchronization; before synchronization it explicitly marks capture time unknown and keeps boot/uptime metadata. The backend distinguishes device generation, gateway receipt and backend arrival. SNTP is not authenticated or an RTC; offline reboot without synchronization cannot establish accurate generation UTC.
 
 ## Feasibility, impact, and future work
 

@@ -6,13 +6,26 @@ This map covers the authoritative Git repository `tamperproject/`. The adjacent 
 
 ## End-to-end data flow
 
-1. The battery-powered ESP32-S3 firmware reads the DHT11, LDR, and MPU6050, derives shock/orientation values, attaches device/shipment identity and sequence metadata, signs the exact event bytes with the ATECC secure element, and sends the signed envelope by HTTP over 2.4 GHz Wi-Fi to the laptop gateway's LAN `POST /ingest` endpoint. USB Serial is available only for firmware flashing and debug logs.
-2. The laptop gateway verifies the P-256 signature and enrollment values, commits the event to a local SQLite outbox, then returns JSON containing `status: success` and the matching `event_id`. It uploads the normalized payload over HTTPS to `POST /api/events` with a device key and idempotency key, retrying transient failures.
-3. FastAPI authenticates the device, validates the event and per-shipment hash-chain relationship, updates shipment state, stores the sensor event, and creates alerts when thresholds or seal/shock conditions require them.
+1. The battery-powered ESP32-S3 firmware reads the same DHT11, LDR, and MPU6050, attaches persistent device/shipment assignment and per-boot identity/sequence metadata, signs the exact event bytes with the ATECC secure element, and commits a bounded LittleFS queue before Wi-Fi HTTP delivery to the laptop gateway's LAN `POST /ingest`. Reboot resumes committed records unchanged. USB Serial is debug/configuration/flashing only, never event transport.
+2. The laptop gateway verifies P-256 signatures and enrollment values, commits its SQLite outbox, and returns the matching JSON ACK. A single FIFO worker uploads every queued payload plus its original envelope and gateway receipt time to the existing HTTPS `POST /api/events`, retrying transient failures. Historical archived/blocked records are retained untouched, not automatically recovered.
+3. FastAPI retains device-key authentication and the same telemetry/alert normalization. Explicitly enrolled devices enforce shipment binding and public-key signature checks; legacy unbound devices remain compatible. Version-2 events store signed evidence and hash links. Signed SNTP generation time (when available), otherwise original gateway receipt time, orders live telemetry so delayed replay cannot overwrite newer state; chain order remains insertion order. Unsynchronized generation time remains explicitly unknown.
 4. Admin and user browser clients authenticate with JWTs. Admin pages use CRUD/reporting endpoints; user pages can read only assigned shipment data. Live views poll shipment detail/live endpoints and render telemetry, history, status, charts, and package orientation.
 5. The static frontends target `https://safetrack-api-live.vercel.app`; their Vercel files build/serve assets and apply browser security headers. The backend is written to use managed PostgreSQL through `DATABASE_URL`, but this repository has no backend `vercel.json` or other explicit backend deployment manifest.
 
 ## Future task domains
+
+### Additions implemented locally on 14 October 2026
+
+- `firmware/tracksure_gateway/durable_queue.h`: atomic committed flash records, checksums, FIFO reboot recovery, removal only after gateway ACK. Maximum 512 records; full/corrupt storage fails closed without erasing committed events.
+- `Tamper_admin/backend/evidence.py`: canonical evidence hashing, legacy hash compatibility, signature/link verification, and independent JSON-export verifier.
+- `GET /api/devices` and `PUT /api/devices/{device_id}/assignment`: admin-only enrollment using an existing device, existing shipment and public P-256 key. No device API keys are returned. Reuse requires paused/drained queues and matching firmware/gateway configuration.
+- `GET /api/shipments/{code}/evidence`: authenticated, shipment-scoped, insertion-order paginated evidence/export route. Existing `/api/events`, shipment detail and 500 ms live polling are retained.
+- `Tamper_admin/frontend/evidence.js` and its standalone-user copy: browser-side SHA-256/link/P-256 verification and evidence download. The active unified user dashboard is `Tamper_admin/frontend/user/dashboard.html` (with `dashboard.js`), not the older `Tamper_user/frontend/app.js`.
+- PostgreSQL remains on Supabase through the existing TLS session pooler; no Supabase Auth or direct browser database access is introduced. Additive columns/indexes use the existing backend migration function; no existing table/data is deleted.
+
+These additions are compile/test verified locally. A protected staged API deployment passed existing-account and existing-data reads; the primary alias remains unchanged. Its additive columns are present in Supabase with RLS retained and event count unchanged. Later local report changes have not been staged. Flashing and physical interruption/reboot/battery validation are deferred because the operator has no ESP32 available. Legacy hashes/signatures can be incomplete, and no external chain anchor exists. See `LIVE_GATEWAY_RUNBOOK.md` for safe rollout/reuse and `docs/IMPROVEMENTS.md` for completed/partial/pending work. `PROJECT_STATUS.md` is absent in the current checkout; status is maintained in README and `docs/RELEASE_NOTES.md` rather than recreating it.
+
+Local operations: `operations/backup_database.py` makes private dumps and validates restoration into its own disposable PostgreSQL cluster; `inspect_outbox.py` reads metadata without leasing or changing rows; `run_postgres_tests.py` creates an isolated local regression database; `verify_cloud.py` performs bounded login/read checks, never telemetry uploads. Gateway `/status` reports queue/receipt/ACK ages, worker state and disk headroom locally. `.github/workflows/regression.yml` prepares isolated software and no-secret-header firmware CI; no GitHub run has occurred. Standalone user `dashboard.js`/`common.js` and `evidence.js` are canonical for the bundled user logic; parcel-aware HTML/CSS remains separate.
 
 ### Firmware / MPU / LDR
 
@@ -20,7 +33,7 @@ This map covers the authoritative Git repository `tamperproject/`. The adjacent 
 |---|---|---|
 | `tamperproject/firmware/tracksure_gateway/tracksure_gateway.ino` | Canonical ESP32-S3 device entry point: initializes DHT11, inverted LDR, MPU6050, ATECC, and optional local Wi-Fi settings; samples sensors, derives shock/orientation, signs and queues telemetry. | GPIO/I2C readings + identity + ignored Wi-Fi configuration + HTTP ACKs â†’ signed envelopes over Wi-Fi/LAN. USB Serial is debugging/flashing only. |
 | `tamperproject/firmware/tracksure_gateway/orientation.h` | Orientation helper used by the canonical firmware for filtered/quaternion orientation state. | Accelerometer/gyroscope samples and elapsed time â†’ orientation values included in telemetry. |
-| `tamperproject/tracksure_final_code.ino` | Root-level alternate firmware entry with substantially the same USB/signed telemetry role. Its presence makes the authoritative sketch ambiguous. | DHT/LDR/MPU/ATECC readings + ACKs â†’ signed `TRACKSURE` serial records. |
+| `tamperproject/tracksure_final_code.ino` | Retained non-authoritative historical USB/signed telemetry sketch. Do not flash for production; the canonical Wi-Fi sketch above is authoritative. | Historical DHT/LDR/MPU/ATECC readings + ACKs â†’ signed `TRACKSURE` serial records. |
 
 ### Gateway delivery
 

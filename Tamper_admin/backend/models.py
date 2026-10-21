@@ -30,6 +30,8 @@ class Device(Base):
     device_id = Column(String(64), unique=True, index=True, nullable=False)
     api_key = Column(String(64), nullable=False)
     status = Column(String(32), default="active")
+    shipment_code = Column(String(64), nullable=True)
+    public_key = Column(Text, nullable=True)  # Public P-256 point, never a private key
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Vehicle(Base):
@@ -95,6 +97,12 @@ class SensorEvent(Base):
     health_level = Column(String(32), default="Optimal")
     previous_hash = Column(String(64), nullable=False)
     record_hash = Column(String(64), nullable=False)
+    evidence_version = Column(Integer, nullable=True)
+    evidence_payload = Column(Text, nullable=True)
+    signed_envelope = Column(Text, nullable=True)
+    public_key = Column(Text, nullable=True)  # Enrollment snapshot for historical verification
+    signature_verified = Column(Boolean, nullable=True)
+    received_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     shipment = relationship("Shipment", back_populates="events")

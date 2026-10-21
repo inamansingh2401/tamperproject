@@ -76,10 +76,10 @@ function renderAssignedShipments() {
         const card = document.createElement('div');
         card.className = 'bg-slate-50 dark:bg-slate-700/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-4 relative group';
 
-        const isSealed = s.seal_status === 'Sealed' || s.seal_status === 'Intact';
-        let sealBadge = isSealed ? 
+        const sealState = normalizeSealState(s.seal_status);
+        let sealBadge = sealState === 'intact' ?
             `<span class="badge badge-optimal"><i data-lucide="lock" class="w-3 h-3"></i> Sealed</span>` :
-            `<span class="badge badge-critical"><i data-lucide="unlock" class="w-3 h-3"></i> Breached</span>`;
+            sealState === 'breached' ? `<span class="badge badge-critical"><i data-lucide="unlock" class="w-3 h-3"></i> Breached</span>` : `<span class="badge">Unknown</span>`;
 
         let statusBadge = s.status === 'In Transit' ? 'badge-in-transit' :
                           s.status === 'Compromised' ? 'badge-critical' : 'badge-at-warehouse';

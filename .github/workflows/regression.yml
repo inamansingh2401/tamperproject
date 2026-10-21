@@ -1,0 +1,60 @@
+name: SafeTrack regression checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  software:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: safetrack_test
+          POSTGRES_USER: safetrack_test
+          POSTGRES_PASSWORD: ephemeral-ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U safetrack_test -d safetrack_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - run: python -m pip install -r Tamper_admin/backend/requirements.txt -r gateway/requirements.txt httpx
+      - name: Isolated SQLite tests
+        run: python -m unittest discover -s tests -p 'test_*.py'
+      - name: Fresh local PostgreSQL tests
+        env:
+          SAFETRACK_TEST_DATABASE_URL: postgresql+psycopg://safetrack_test:ephemeral-ci-only@127.0.0.1:5432/safetrack_test
+        run: python -m unittest discover -s tests -p 'test_*.py'
+      - name: Browser verifier and UI contracts
+        run: |
+          node tests/test_evidence.cjs
+          node tests/test_ui_state.cjs
+          node tests/test_reports.cjs
+      - run: npm ci
+        working-directory: Tamper_admin/frontend
+      - run: npm run build
+        working-directory: Tamper_admin/frontend
+      - run: git diff --exit-code -- Tamper_admin/frontend/user/dashboard.js Tamper_admin/frontend/user/common.js Tamper_admin/frontend/evidence.js
+      - run: git diff --check
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: arduino/setup-arduino-cli@81d310742121c928ea9c8bbd407b4217b432ae02 # v2
+        with:
+          version: '1.5.1'
+      - run: arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      - run: arduino-cli core install esp32:esp32@3.3.11 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      - run: arduino-cli lib install 'ArduinoJson@7.4.3' 'ArduinoECCX08@1.4.1' 'DHT sensor library@1.4.7' 'Adafruit Unified Sensor@1.1.15'
+      - name: Compile without private Wi-Fi header (no flashing)
+        run: arduino-cli compile --fqbn esp32:esp32:esp32s3 --jobs 4 firmware/tracksure_gateway

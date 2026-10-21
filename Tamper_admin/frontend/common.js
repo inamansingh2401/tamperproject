@@ -1,4 +1,15 @@
 'use strict';
+window.normalizeSealState = value => {
+  const state = String(value || '').trim().toLowerCase();
+  if (['intact', 'sealed'].includes(state)) return 'intact';
+  if (['compromised', 'breached', 'breach', 'open'].includes(state)) return 'breached';
+  return 'unknown';
+};
+window.parseSafeTrackUTC = value => {
+  let timestamp = String(value || '');
+  if (/^\d{4}-\d{2}-\d{2}T/.test(timestamp) && !/(Z|[+-]\d{2}:?\d{2})$/i.test(timestamp)) timestamp += 'Z';
+  return new Date(timestamp);
+};
 // Previous versions persisted login tokens indefinitely. Expire those sessions once.
 for (const key of ['safetrack_access_token', 'safetrack_role', 'safetrack_username', 'safetrack_assigned_shipments']) {
   localStorage.removeItem(key);

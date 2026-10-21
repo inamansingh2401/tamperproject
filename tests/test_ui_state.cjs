@@ -1,0 +1,10 @@
+const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
+const context = {window:{},localStorage:{removeItem(){}},document:{addEventListener(){}}};
+vm.createContext(context);
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../Tamper_admin/frontend/common.js'),'utf8'),context);
+for (const value of ['INTACT','Intact','intact','SEALED','Sealed']) assert.equal(context.window.normalizeSealState(value),'intact');
+for (const value of ['COMPROMISED','Compromised','BREACHED','Breached','open']) assert.equal(context.window.normalizeSealState(value),'breached');
+for (const value of ['',null,'unexpected']) assert.equal(context.window.normalizeSealState(value),'unknown');
+assert.equal(context.window.parseSafeTrackUTC('2026-10-14T01:00:00').toISOString(),'2026-10-14T01:00:00.000Z');
+assert.equal(context.window.parseSafeTrackUTC('2026-10-14T01:00:00+05:30').toISOString(),'2026-10-13T19:30:00.000Z');
+console.log('PASS: seal states and UTC presentation');

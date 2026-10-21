@@ -1,7 +1,7 @@
 /**
  * SafeTrack Admin Console - Shipments Management Controller
  *
- * Live data source: FastAPI -> SQLite -> /api/shipments
+ * Live data source: Wi-Fi gateway -> FastAPI -> PostgreSQL -> /api/shipments
  * The shipment inspector displays the same telemetry events that the
  * Operator/User dashboard receives from the backend.
  */
@@ -41,7 +41,7 @@ const number = (value, digits = 1) => {
 
 function formatDateTime(value) {
     if (!value) return "—";
-    const d = new Date(value);
+    const d = parseSafeTrackUTC(value);
     if (Number.isNaN(d.getTime())) return esc(value);
     return d.toLocaleString([], {
         day: "2-digit",
@@ -54,7 +54,7 @@ function formatDateTime(value) {
 
 function formatTime(value) {
     if (!value) return "—";
-    const d = new Date(value);
+    const d = parseSafeTrackUTC(value);
     if (Number.isNaN(d.getTime())) return esc(value);
     return d.toLocaleTimeString([], {
         hour: "2-digit",
@@ -128,10 +128,11 @@ function renderShipmentsTable() {
         const temperature = number(s.latest_temperature, 1);
 
         const statusBadge = statusBadgeClass(s.status);
-        const isSealed = s.seal_status === "Sealed" || s.seal_status === "Intact";
-        const sealBadge = isSealed
+        const sealState = normalizeSealState(s.seal_status);
+        const sealBadge = sealState === 'intact'
             ? `<span class="badge badge-optimal"><i data-lucide="lock" class="w-3 h-3"></i> Sealed</span>`
-            : `<span class="badge badge-critical"><i data-lucide="unlock" class="w-3 h-3"></i> Breached</span>`;
+            : sealState === 'breached' ? `<span class="badge badge-critical"><i data-lucide="unlock" class="w-3 h-3"></i> Breached</span>`
+            : `<span class="badge"><i data-lucide="help-circle" class="w-3 h-3"></i> Unknown</span>`;
 
         const tr = document.createElement("tr");
         tr.className = "hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors";
@@ -326,16 +327,22 @@ async function inspectShipment(code, silent = false) {
 function updateAdminLiveFields(details) {
     const latest = details.latest_telemetry || null;
     if (!latest) return;
+    const mpuKnown = latest.mpu_read_ok === true;
     const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
     set("inspect-last-update", formatDateTime(latest.created_at));
-    set("inspect-pitch", `${number(latest.pitch, 1)}°`);
-    set("inspect-roll", `${number(latest.roll, 1)}°`);
-    set("inspect-accel", `${number(latest.accel_g, 2)} g`);
-    set("inspect-gyro", `${number(latest.gyro_dps, 1)} °/s`);
+    set("inspect-pitch", mpuKnown ? `${number(latest.pitch, 1)}°` : 'Unavailable');
+    set("inspect-roll", mpuKnown ? `${number(latest.roll, 1)}°` : 'Unavailable');
+    set("inspect-accel", mpuKnown ? `${number(latest.accel_g, 2)} g` : 'Unavailable');
+    set("inspect-gyro", mpuKnown ? `${number(latest.gyro_dps, 1)} °/s` : 'Unavailable');
     set("inspect-temperature", `${number(latest.temperature, 1)} °C`);
     set("inspect-humidity", `${number(latest.humidity, 1)} %`);
-    set("inspect-light", `${number(latest.light_lux, 1)} LUX`);
-    set("inspect-acceleration", `${number(latest.accel_g, 2)} g`);
+    set("inspect-light", `${number(latest.light_lux, 1)} ${latest.light_unit || 'unit unknown'}`);
+    set("inspect-mpu-status", latest.mpu_read_ok === true ? 'MPU6050 ACTIVE' : 'MPU READING UNAVAILABLE');
+    set("inspect-acceleration", mpuKnown ? `${number(latest.accel_g, 2)} g` : 'Unavailable');
+    if (!mpuKnown) {
+        set('inspect-orientation-label','Unavailable');
+        set('inspect-motion-label','Unavailable');
+    }
     if (Array.isArray(details.events)) set("inspect-event-count", `${details.events.length} EVENTS`);
 }
 
@@ -346,6 +353,7 @@ function renderShipmentInspector(details) {
 
     const s = details.shipment || {};
     const latest = details.latest_telemetry || null;
+    const mpuKnown = latest?.mpu_read_ok === true;
     const events = Array.isArray(details.events) ? [...details.events] : [];
     const alerts = Array.isArray(details.alerts) ? details.alerts : [];
 
@@ -360,8 +368,8 @@ function renderShipmentInspector(details) {
     const latestTemp = latest ? number(latest.temperature, 1) : "—";
     const latestHumidity = latest ? number(latest.humidity, 1) : "—";
     const latestLight = latest ? number(latest.light_lux, 1) : "—";
-    const latestAccel = latest ? number(latest.accel_g, 2) : "—";
-    const latestGyro = latest ? number(latest.gyro_dps, 1) : "0.0";
+    const latestAccel = mpuKnown ? number(latest.accel_g, 2) : "Unavailable";
+    const latestGyro = mpuKnown ? number(latest.gyro_dps, 1) : "Unavailable";
     const latestHash = latest ? String(latest.record_hash || "—").substring(0, 16) + "..." : "Genesis";
     const prevHash = latest ? String(latest.previous_hash || "—").substring(0, 16) + "..." : "00000000...";
 
@@ -396,6 +404,10 @@ function renderShipmentInspector(details) {
     } else if (absPitch >= 8 || absRoll >= 8) {
         orientBadgeCls = "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60";
         orientLabel = `Tilted (${absPitch > absRoll ? 'Pitch' : 'Roll'} ${Math.max(absPitch, absRoll).toFixed(0)}°)`;
+    }
+    if (!mpuKnown) {
+        orientLabel = shockLabel = 'Unavailable';
+        orientBadgeCls = shockBadgeCls = 'bg-slate-100 text-slate-500 border-slate-200';
     }
 
     const logsRows = events.length
@@ -476,7 +488,7 @@ function renderShipmentInspector(details) {
                         <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
                         <span>Reset View</span>
                     </button>
-                    <span class="px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-[10px] font-mono font-bold border border-blue-100 dark:border-blue-900/40">MPU6050 ACTIVE</span>
+                    <span id="inspect-mpu-status" class="px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-[10px] font-mono font-bold border border-blue-100 dark:border-blue-900/40">${latest?.mpu_read_ok === true ? 'MPU6050 ACTIVE' : 'MPU READING UNAVAILABLE'}</span>
                 </div>
             </div>
 
@@ -499,14 +511,14 @@ function renderShipmentInspector(details) {
                             <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Orientation</p>
                             <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold mt-1 ${orientBadgeCls}">
                                 <i data-lucide="compass" class="w-3 h-3"></i>
-                                <span>${orientLabel}</span>
+                                <span id="inspect-orientation-label">${orientLabel}</span>
                             </span>
                         </div>
                         <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30">
                             <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Motion & Shock</p>
                             <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-bold mt-1 ${shockBadgeCls}">
                                 <i data-lucide="activity" class="w-3 h-3"></i>
-                                <span>${shockLabel}</span>
+                                <span id="inspect-motion-label">${shockLabel}</span>
                             </span>
                         </div>
                     </div>
@@ -515,11 +527,11 @@ function renderShipmentInspector(details) {
                     <div class="grid grid-cols-2 gap-2">
                         <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                             <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Pitch Angle (Tilt X)</p>
-                            <p class="text-base font-bold font-mono text-slate-900 dark:text-white mt-0.5">${targetPitch >= 0 ? '+' : ''}${targetPitch.toFixed(1)}°</p>
+                            <p id="inspect-pitch" class="text-base font-bold font-mono text-slate-900 dark:text-white mt-0.5">${mpuKnown ? `${targetPitch >= 0 ? '+' : ''}${targetPitch.toFixed(1)}°` : 'Unavailable'}</p>
                         </div>
                         <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                             <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Roll Angle (Tilt Z)</p>
-                            <p class="text-base font-bold font-mono text-slate-900 dark:text-white mt-0.5">${targetRoll >= 0 ? '+' : ''}${targetRoll.toFixed(1)}°</p>
+                            <p id="inspect-roll" class="text-base font-bold font-mono text-slate-900 dark:text-white mt-0.5">${mpuKnown ? `${targetRoll >= 0 ? '+' : ''}${targetRoll.toFixed(1)}°` : 'Unavailable'}</p>
                         </div>
                     </div>
 
@@ -558,7 +570,7 @@ function renderShipmentInspector(details) {
             </div>
             <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Light</p>
-                <p id="inspect-light" class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestLight} <span class="text-xs font-medium">LUX</span></p>
+                <p id="inspect-light" class="text-base font-bold text-slate-900 dark:text-white mt-1">${latestLight} <span class="text-xs font-medium">${esc(latest?.light_unit || 'unit unknown')}</span></p>
             </div>
             <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                 <p class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Acceleration</p>
@@ -577,6 +589,11 @@ function renderShipmentInspector(details) {
                     <p class="text-[10px] text-slate-400 mt-0.5">Latest ${events.length} cryptographic records for shipment ${esc(s.id || s.code)}</p>
                 </div>
                 <span id="inspect-event-count" class="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-300">${events.length} EVENTS</span>
+            </div>
+            <div class="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+                <button id="inspect-verify-evidence" type="button" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs">Verify evidence</button>
+                <button id="inspect-download-evidence" type="button" disabled class="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-xs">Download evidence</button>
+                <p id="inspect-evidence-result" role="status" class="text-xs text-slate-500 mt-2">Not checked in this browser. Legacy events may lack signatures.</p>
             </div>
             <div class="max-h-64 overflow-auto">
                 <table class="w-full text-left text-[11px]">
@@ -600,6 +617,18 @@ function renderShipmentInspector(details) {
             </div>
         </div>
 
+        <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 bg-white dark:bg-slate-800">
+            <h4 class="font-bold text-sm">Device assignment</h4>
+            <p class="text-xs text-slate-500 mt-2">Bound devices: ${esc((s.bound_device_ids || []).join(', ') || 'Not enrolled yet')}. Only matching device/shipment readings are accepted after enrollment.</p>
+            <form id="inspect-device-assignment" class="space-y-2 mt-3">
+                <label class="block text-xs">Device ID<select id="inspect-device-id" required class="block w-full p-2 border rounded-lg"><option value="">Loading enrolled devices…</option></select></label>
+                <label class="block text-xs">ATECC public key (128/130 hex characters, NOT a private key)<input id="inspect-device-public-key" required pattern="[a-fA-F0-9]{128}|[a-fA-F0-9]{130}" class="block w-full p-2 border rounded-lg" autocomplete="off"></label>
+                <label class="block text-xs"><input id="inspect-device-drained" type="checkbox" required> Sampling paused; ESP32 queue and gateway queued/blocked events drained.</label>
+                <button type="submit" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs">Bind device to ${esc(s.id || s.code)}</button>
+                <p id="inspect-device-result" role="status" class="text-xs text-slate-500">Then match the local gateway and persistent ESP32 assignment before resuming.</p>
+            </form>
+        </div>
+
         <!-- INCIDENTS -->
         <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 bg-white dark:bg-slate-800">
             <div class="flex items-center justify-between mb-3">
@@ -615,10 +644,47 @@ function renderShipmentInspector(details) {
 
     if (window.lucide) lucide.createIcons();
 
+    bindInspectorEvidenceAndDevice(s.id || s.code);
     // Mount or refresh the 3D scene for this exact shipment
     setTimeout(() => {
         initAdmin3DPackageScene();
     }, 40);
+}
+
+function bindInspectorEvidenceAndDevice(code) {
+    let bundle = null;
+    const fetchJSON = async path => (await authFetch(`${API_CONFIG.BASE_URL.replace(/\/api$/, '')}${path}`)).json();
+    const verify = document.getElementById('inspect-verify-evidence');
+    const download = document.getElementById('inspect-download-evidence');
+    verify.addEventListener('click', async () => {
+        try {
+            bundle = await TrackSureEvidence.verifyShipment(fetchJSON, code, document.getElementById('inspect-evidence-result'), verify);
+            download.disabled = false;
+        } catch (_) { bundle = null; download.disabled = true; }
+    });
+    download.addEventListener('click', () => { if (bundle) TrackSureEvidence.download(bundle); });
+    const deviceSelect = document.getElementById('inspect-device-id');
+    fetchJSON('/api/devices').then(devices => {
+        deviceSelect.innerHTML = '<option value="">Choose device</option>' + devices.filter(d => d.status === 'active').map(d =>
+            `<option value="${esc(d.device_id)}">${esc(d.device_id)} → ${esc(d.shipment_code || 'Unassigned')}</option>`).join('');
+    }).catch(() => { deviceSelect.innerHTML = '<option value="">Device enrollment unavailable (API update required)</option>'; });
+    document.getElementById('inspect-device-assignment').addEventListener('submit', async event => {
+        event.preventDefault();
+        const result = document.getElementById('inspect-device-result');
+        const button = event.currentTarget.querySelector('button');
+        button.disabled = true;
+        try {
+            const response = await authFetch(`${API_CONFIG.BASE_URL}/devices/${encodeURIComponent(deviceSelect.value)}/assignment`, {
+                method:'PUT', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({
+                    shipment_code:code, public_key:document.getElementById('inspect-device-public-key').value.trim(),
+                    confirm_drained:document.getElementById('inspect-device-drained').checked
+                })
+            });
+            const binding = await response.json();
+            result.textContent = `Saved ${binding.device_id} → ${binding.shipment_code}. Match gateway/ESP32 assignment, then RESUME.`;
+        } catch (error) { result.textContent = `Assignment not saved: ${error.message}`; }
+        finally { button.disabled = false; }
+    });
 }
 
 function startInspectionAutoRefresh(code) {
@@ -634,7 +700,7 @@ function startInspectionAutoRefresh(code) {
 }
 
 function updateAdminOrientation(latest) {
-    if (!latest || latest.mpu_read_ok === false) return;
+    if (!latest || latest.mpu_read_ok !== true) return;
     const q=latest.orientation_q;
     if (Array.isArray(q) && q.length===4 && q.every(Number.isFinite)) {
         // Sensor Z-up to Three.js Y-up: (x,y,z) -> (x,z,-y).

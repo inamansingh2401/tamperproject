@@ -17,6 +17,7 @@ let snapshotLoading = false;
 let liveLoading = false;
 let currentAlerts = [];
 let latestLedgerEvent = null;
+let verifiedEvidenceBundle = null;
 
 const $ = id => document.getElementById(id);
 const escapeValue = value => window.escapeHTML
@@ -30,10 +31,30 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function bindInterface() {
+  $('verifyEvidenceBtn')?.addEventListener('click', async () => {
+    const code = currentShipmentCode;
+    if (!code) return;
+    try {
+      const bundle = await TrackSureEvidence.verifyShipment(async path => {
+        const page = await (await api(path)).json();
+        if (code !== currentShipmentCode) throw new Error('Shipment changed; verify the newly selected shipment');
+        return page;
+      }, code, $('evidenceResult'), $('verifyEvidenceBtn'));
+      if (code === currentShipmentCode) { verifiedEvidenceBundle = bundle; $('downloadEvidenceBtn').disabled = false; }
+    } catch (_) { verifiedEvidenceBundle = null; }
+  });
+  $('downloadEvidenceBtn')?.addEventListener('click', () => {
+    if (verifiedEvidenceBundle?.shipment_code === currentShipmentCode) TrackSureEvidence.download(verifiedEvidenceBundle);
+  });
   $('loginForm')?.addEventListener('submit', handleLogin);
   $('logoutBtn')?.addEventListener('click', logout);
   $('retryBtn')?.addEventListener('click', () => loadSnapshot());
   $('shipmentSelector')?.addEventListener('change', event => selectShipment(event.target.value));
+  $('shipmentSelector')?.addEventListener('change', () => {
+    verifiedEvidenceBundle = null;
+    $('downloadEvidenceBtn').disabled = true;
+    $('evidenceResult').textContent = 'Not checked for this shipment. Click Verify evidence.';
+  });
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && authToken && currentShipmentCode) loadSnapshot({ quiet: true });
   });
@@ -210,7 +231,8 @@ async function pollLive() {
 
 async function api(path) {
   const response = await window.fetchWithTimeout(`${API_BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${authToken}`, 'Cache-Control': 'no-cache' }
+    headers: { Authorization: `Bearer ${authToken}` },
+    cache: 'no-store'
   });
   if (response.status === 401 || response.status === 403) {
     logout();
@@ -272,6 +294,7 @@ function renderJourney(status) {
 }
 
 function renderTelemetry(reading) {
+  window.SafeTrackParcel?.update(reading);
   if (!reading) {
     ['temperatureValue','humidityValue','lightValue','accelerationValue','orientationValue'].forEach(id => setText(id, '—'));
     return;
@@ -280,6 +303,7 @@ function renderTelemetry(reading) {
   const temperature = finite(reading.temperature);
   const humidity = finite(reading.humidity);
   const light = finite(reading.light_lux);
+  setText('lightUnit', reading.light_unit === 'RELATIVE' ? 'relative' : reading.light_unit === 'LUX' ? 'lux' : 'unit unknown');
   const acceleration = finite(reading.accel_g);
   const pitch = finite(reading.pitch);
   const roll = finite(reading.roll);
@@ -289,16 +313,16 @@ function renderTelemetry(reading) {
   setMetric('light', light, value => value.toFixed(0), light == null ? 'Waiting' : light >= 800 ? 'Seal exposed' : 'Seal protected', light == null ? 'neutral' : light >= 800 ? 'danger' : 'good', scale(light, 0, 1200));
   setMetric('acceleration', acceleration, value => value.toFixed(2), acceleration == null ? 'Waiting' : acceleration >= 3 ? 'Impact detected' : 'Normal motion', acceleration == null ? 'neutral' : acceleration >= 3 ? 'danger' : 'good', scale(acceleration, 0, 5));
 
-  const orientationKnown = reading.mpu_read_ok !== false && (pitch != null || roll != null);
+  const orientationKnown = reading.mpu_read_ok === true && (pitch != null || roll != null);
   const maxTilt = Math.max(Math.abs(pitch || 0), Math.abs(roll || 0));
   const orientationLabel = !orientationKnown ? 'Unavailable' : maxTilt > 60 ? 'Package tilted' : maxTilt > 25 ? 'Tilt detected' : 'Stable / upright';
   const orientationTone = !orientationKnown ? 'neutral' : maxTilt > 60 ? 'danger' : maxTilt > 25 ? 'warning' : 'good';
   setText('orientationValue', orientationLabel);
   setText('orientationState', !orientationKnown ? 'No MPU reading' : orientationTone === 'good' ? 'Stable' : 'Review');
-  $('orientationState').className = `metric-state ${orientationTone}`;
+  if ($('orientationState')) $('orientationState').className = `metric-state ${orientationTone}`;
   setText('orientationDetail', `Pitch ${formatAngle(pitch)} · Roll ${formatAngle(roll)}`);
-  $('axisBox').style.setProperty('--pitch', `${clamp(pitch || 0, -55, 55)}deg`);
-  $('axisBox').style.setProperty('--roll', `${clamp(roll || 0, -55, 55)}deg`);
+  $('axisBox')?.style.setProperty('--pitch', `${clamp(pitch || 0, -55, 55)}deg`);
+  $('axisBox')?.style.setProperty('--roll', `${clamp(roll || 0, -55, 55)}deg`);
 }
 
 function setMetric(name, value, format, label, tone, marker) {
@@ -309,18 +333,19 @@ function setMetric(name, value, format, label, tone, marker) {
 }
 
 function renderIntegrity(shipment, latest, alerts) {
-  const sealBreached = String(shipment.seal_status || '').toLowerCase().includes('breach') || finite(latest?.light_lux) >= 800;
+  const sealBreached = normalizeSealState(shipment.seal_status) === 'breached' || finite(latest?.light_lux) >= 800;
   const criticalAlert = alerts.some(alert => String(alert.status).toLowerCase() === 'active' && String(alert.severity).toLowerCase().includes('critical'));
   const activeAlerts = alerts.filter(alert => String(alert.status).toLowerCase() === 'active');
   const degraded = String(shipment.health_level || '').toLowerCase().includes('degrad') || activeAlerts.length > 0;
-  const ledgerEvent = latest?.record_hash ? latest : latestLedgerEvent;
+  const ledgerEvent = latest?.record_hash ? latest : latestLedgerEvent?.id === latest?.id ? latestLedgerEvent : null;
   const hasLedger = Boolean(ledgerEvent?.record_hash);
 
-  let state = 'verified';
-  let title = hasLedger ? 'Integrity verified' : 'Shipment is being monitored';
-  let message = hasLedger ? 'The latest signed reading was accepted and linked to the tamper-evident event ledger.' : 'Live shipment data is available; a ledger hash has not been returned yet.';
+  const verified = ledgerEvent?.verification?.integrity === 'verified' && ledgerEvent?.verification?.signature === 'verified';
+  let state = verified ? 'verified' : 'monitoring';
+  let title = verified ? 'Signed reading verified' : 'Shipment is being monitored';
+  let message = hasLedger ? 'Readings are linked to the event ledger. Use Verify evidence to check hashes, links and available signatures.' : 'Live shipment data is available; a ledger hash has not been returned yet.';
   let icon = 'shield-check';
-  let eyebrow = 'VERIFIED CHAIN OF CUSTODY';
+  let eyebrow = 'SHIPMENT EVIDENCE';
   if (sealBreached || criticalAlert) {
     state = 'critical'; title = 'Integrity action required'; message = 'A critical condition or container exposure has been detected. Review the active alert before accepting custody.'; icon = 'shield-alert'; eyebrow = 'CRITICAL SECURITY STATE';
   } else if (degraded) {
@@ -334,7 +359,7 @@ function renderIntegrity(shipment, latest, alerts) {
   setText('integrityEyebrow', eyebrow);
   setText('integrityStatus', title);
   setText('integrityMessage', message);
-  setText('cryptoStatus', hasLedger ? 'Gateway verified · ledger linked' : 'Awaiting ledger record');
+  setText('cryptoStatus', verified ? 'API signature/hash checked · verify full chain below' : hasLedger ? 'Ledger stored · signature not verified' : 'Awaiting ledger record');
   setText('sealStatus', sealBreached ? 'Breach detected' : shipment.seal_status || 'Intact');
   setText('deviceIdentity', latest?.device_id || ledgerEvent?.device_id || 'Awaiting device');
   refreshIcons();
@@ -369,13 +394,14 @@ function renderEvents(events) {
   $('eventList').innerHTML = events.map(event => {
     const descriptor = describeEvent(event);
     const hash = event.record_hash ? shortHash(event.record_hash) : 'Not recorded';
-    const verified = Boolean(event.record_hash);
+    const verified = event.verification?.integrity === 'verified' && event.verification?.signature === 'verified';
+    const label = event.verification?.integrity === 'invalid' ? 'Integrity failed' : verified ? 'Signature + hash checked' : event.verification?.integrity === 'verified' ? 'Hash checked · no signature' : 'Not verified';
     return `<article class="event-item">
       <div class="event-kind"><span class="event-icon ${descriptor.tone}"><i data-lucide="${descriptor.icon}"></i></span><span><strong>${descriptor.label}</strong><small>${escapeValue(event.event_id || event.device_id || 'Sensor event')}</small></span></div>
       <div class="event-reading">${escapeValue(descriptor.value)}</div>
       <time class="event-time" datetime="${escapeValue(event.created_at || '')}">${formatDateTime(event.created_at)}</time>
       <code class="event-hash" title="${escapeValue(event.record_hash || '')}">${escapeValue(hash)}</code>
-      <span class="verification ${verified ? '' : 'pending'}"><i data-lucide="${verified ? 'badge-check' : 'clock-3'}"></i>${verified ? 'Gateway verified' : 'Pending'}</span>
+      <span class="verification ${verified ? '' : 'pending'}"><i data-lucide="${verified ? 'badge-check' : 'clock-3'}"></i>${label}</span>
     </article>`;
   }).join('');
   refreshIcons();
@@ -385,7 +411,7 @@ function describeEvent(event) {
   const temperature = finite(event.temperature);
   const light = finite(event.light_lux);
   const acceleration = finite(event.accel_g);
-  if (light != null && light >= 800) return { label: 'Seal exposure detected', value: `${light.toFixed(0)} lux`, icon: 'sun-medium', tone: 'danger' };
+  if (light != null && light >= 800) return { label: 'Seal exposure detected', value: `${light.toFixed(0)} ${event.light_unit === 'RELATIVE' ? 'relative' : event.light_unit === 'LUX' ? 'lux' : '(unit unknown)'}`, icon: 'sun-medium', tone: 'danger' };
   if (acceleration != null && acceleration >= 3) return { label: 'Impact threshold crossed', value: `${acceleration.toFixed(2)} g`, icon: 'activity', tone: 'danger' };
   if (temperature != null && (temperature > 8 || temperature < 2)) return { label: 'Temperature warning', value: `${temperature.toFixed(1)} °C`, icon: 'thermometer', tone: 'warning' };
   return { label: 'Telemetry receipt', value: temperature == null ? 'Sensor update' : `${temperature.toFixed(1)} °C`, icon: 'radio-tower', tone: '' };

@@ -1,5 +1,11 @@
 # TrackSure live gateway runbook
 
+## Rollout note — 14 October 2026
+
+Reboot-safe buffering, complete queued-history delivery, backend enrollment and evidence verification are implemented locally, not yet flashed/deployed. Keep the working installation intact until the local changes are reviewed. Install the updated backend dependency (`cryptography`) and deploy its additive migrations first; existing PostgreSQL tables and RLS/access controls are retained. Then update the gateway/frontend and enroll the current device using its existing ATECC public key and shipment. Flash the canonical firmware with the same ignored Wi-Fi configuration and board/partition settings, **without erasing NVS/LittleFS**, and perform the bounded independent-power acceptance test below. Do not upload/format a filesystem image over retained events.
+
+First installation may format the previously unused LittleFS partition once. Subsequent mount failures never auto-format. A corrupt committed record stops the queue and requires reviewed recovery; this prototype does not include a corrupt-flash repair utility.
+
 Backend API:
 
 `https://safetrack-api-live.vercel.app`
@@ -72,7 +78,7 @@ The gateway stores each reading locally before acknowledging the ESP32, then pos
 
 ## 3. Secure element
 
-The production gateway requires a valid ATECC508A signature. The public key stays on the laptop and is never committed. To configure verification:
+The production gateway requires a valid ATECC508A signature. Keep the public-key enrollment file local; its public point may also be enrolled in the backend and included in evidence exports. Never upload the private key. To configure verification:
 
 1. Put the public key in a PEM or raw hex file on the laptop.
 2. Update `gateway/gateway.local.json`:
@@ -107,9 +113,52 @@ Shipment:
 
 `PRCL-2024-05-21-001`
 
-Change both in `gateway/gateway.local.json` and `firmware/tracksure_gateway/tracksure_gateway.ino` if the cloud shipment changes.
+These remain the first-use defaults. Ordinary reboot does not change identity or create a new shipment. Once an assignment is saved in NVS, it overrides the compiled shipment default; use the reuse workflow below rather than reflashing random IDs.
 
-## 5. PostgreSQL deployment settings
+## 5. Reboot and device reuse
+
+### Ordinary reboot / power restoration
+
+1. Power the ESP32 independently. It initializes the same sensors/ATECC and joins the configured Wi-Fi without waiting indefinitely for USB.
+2. It loads the saved shipment and pause state, increments a persistent boot counter and creates a new random boot ID. Sequence numbers start at zero **per boot**; event IDs remain unique across boots.
+3. Previously committed envelopes are replayed FIFO with their original event IDs, bytes and signatures. New signed events are appended to flash. A matching gateway ACK removes only that committed record; the gateway then owns durable cloud delivery.
+4. Gateway restart retains its SQLite outbox and resumes FIFO retries. Cloud duplicate IDs are acknowledged without adding another row. IDs reused with changed version-2 readings are rejected.
+5. The backend stores events under the payload's shipment and enforces the enrolled binding. Admin and assigned-user dashboards already query that shipment; no alternate telemetry pipeline or manual dashboard mapping is added.
+
+The flash buffer holds at most 512 records (approximately 8.5 minutes at one event/second, possibly less if space runs out). Full/corrupt storage retains old records but cannot record new samples; logs report the gap. An abrupt outage **before** a flash commit cannot preserve that in-flight sample. New firmware signs `captured_at_ms` after SNTP synchronization; before that it records null/unknown plus boot ID and uptime. The backend uses signed capture UTC when available, otherwise original gateway receipt time. SNTP is unauthenticated; an offline reboot still needs synchronization or a future RTC for reliable generation UTC.
+
+### Reusing the same device for another shipment
+
+1. On the development Serial console send `PAUSE` followed by newline. This is a local configuration command, not USB event transport. Sampling pause persists across reboot, while Wi-Fi queued delivery continues.
+2. Send `STATUS` and wait for ESP32 `queue=0`. Check the existing gateway `/status` locally: `queued` and `blocked` must both be zero. Investigate blocked rows; never clear/delete them just to reassign. Previously archived historical rows are preserved and do not count as current queue delivery.
+3. Stop the gateway after queues drain. In Admin → Shipments → Inspect the target shipment → Device assignment, select the existing device and enter its **existing public P-256 point** (128/130 hex characters). Confirm queues are drained and save. Only administrators can bind; key rotation is rejected by this workflow.
+4. Set the same `shipment_code` in the ignored `gateway/gateway.local.json`. Keep device ID, device key, public key and Wi-Fi transport unchanged. Restart the gateway with that configuration.
+5. Send `ASSIGN <exact-shipment-code>` followed by newline to the paused ESP32. It refuses reassignment with pending device records. Then send `RESUME`. No firmware reflash is required for shipment reuse.
+6. Disconnect USB, independently power the device and verify **one** event appears under the new shipment in both authorized dashboards. Old history stays with the previous shipment; a new event with the old shipment is rejected after enrollment.
+
+Backend `confirm_drained` records an operator assertion, not a remotely proven empty hardware/gateway queue. Changing cloud binding alone does not configure the ESP32/gateway. Keep the three assignments consistent and perform the bounded test; no automatic remote provisioning is claimed.
+
+### Evidence checks
+
+Use **Verify evidence** in the admin inspector or user Events view. Browser WebCrypto recomputes hashes and checks links and available P-256 signatures; the existing live polling stays unchanged. Download the JSON evidence and independently run:
+
+```powershell
+python Tamper_admin/backend/evidence.py <shipment-evidence.json>
+```
+
+Legacy events without original signatures are reported as unavailable, not hardware-verified. Enroll the existing device public key before requiring server-side signature checks. Trust the enrollment key and any prefix anchor independently; a hash chain without an external anchor cannot prove that a server omitted the end of history. Replayed history with an older signed capture timestamp or original gateway receipt timestamp is persisted without reverting newer live state.
+
+### Required physical acceptance after rollout (not performed in this change)
+
+Deferred on 14 October 2026 at the operator's request: the ESP32 is unavailable. Firmware compilation is not physical acceptance. Do not flash another board or substitute USB events.
+
+Create one signed event during a controlled Wi-Fi interruption; power-cycle the device after the committed-record log/debug indication; restore Wi-Fi; confirm the same ID/signature reaches the gateway/cloud once and appears under the correct shipment. Also restart the gateway with a queued event. USB must be disconnected during event delivery. Do not mutate the production outbox, perform mass archived-history replay, or treat USB debug activity as network success.
+
+### Read-only delivery diagnostics
+
+Check local `/status`: `cloud_upload_enabled`, `cloud_worker_alive`, queue/blocked counts, `oldest_queued_age_seconds`, verified receipt/ACK ages, and `free_disk_bytes`. A responding dashboard GET is not proof of fresh cloud delivery. `python operations/inspect_outbox.py` reads the existing outbox in SQLite read-only/query-only mode and prints metadata, not signed payloads or keys. It never retries, requeues or deletes a record. The current archived/blocked backlog still requires a separately reviewed recovery plan.
+
+## 6. PostgreSQL deployment settings
 
 Set these secrets in the existing backend deployment environment:
 

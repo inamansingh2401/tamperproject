@@ -6,6 +6,9 @@
 #include <mbedtls/sha256.h>
 #include <math.h>
 #include <esp_system.h>
+#include <time.h>
+#include <sys/time.h>
+#include "durable_queue.h"
 // Wi-Fi is the only production event transport. The ignored local settings
 // header keeps network credentials out of source control.
 #define TRACKSURE_ENABLE_WIFI 1
@@ -29,6 +32,11 @@
 
 const char* DEVICE_ID = "ESP32-S3-TRACKER-01";
 const char* SHIPMENT_CODE = "PRCL-2024-05-21-001";
+String activeShipment;
+bool samplingPaused = false;
+Preferences devicePreferences;
+DurableQueue outgoing;
+uint64_t bootCounter = 0;
 const char* WAREHOUSE_LOCATION = "Rewari Transit Hub, HR";
 
 // =====================================================
@@ -119,8 +127,6 @@ bool pendingShock = false;
 float pendingPeak = 0;
 uint32_t eventSequence = 0;
 char bootId[17];
-struct OutgoingRecord { char data[2048]; char id[100]; };
-QueueHandle_t outgoing;
 
 #ifdef TRACKSURE_WIFI
 bool wifiWasConnected = false;
@@ -129,6 +135,8 @@ void maintainWiFi() {
     const bool connected = WiFi.status() == WL_CONNECTED;
     if (connected) {
         if (!wifiWasConnected) {
+            // Nonblocking SNTP. Unknown time remains unknown until synchronized.
+            configTime(0, 0, "pool.ntp.org", "time.google.com");
             Serial.printf("[WiFi] Connected; device IP: %s\n", WiFi.localIP().toString().c_str());
         }
         wifiWasConnected = true;
@@ -174,7 +182,7 @@ int readFilteredLdr() {
 void relayTask(void*) {
     OutgoingRecord record;
     for (;;) {
-        if (xQueueReceive(outgoing, &record, portMAX_DELAY) != pdTRUE) continue;
+        if (!outgoing.peek(record)) { vTaskDelay(pdMS_TO_TICKS(250)); continue; }
         bool acknowledged = false;
         while (!acknowledged) {
 #ifdef TRACKSURE_WIFI
@@ -192,7 +200,13 @@ void relayTask(void*) {
                         ack["status"].as<String>() == "success") acknowledged = true;
                 }
                 http.end();
-                if (acknowledged) { Serial.println("[WiFi] Gateway acknowledged signed record"); break; }
+                if (acknowledged) {
+                    if (outgoing.acknowledge(record)) {
+                        Serial.printf("[WiFi] Gateway ACK; durable event %s delivered.\n", record.id);
+                        break;
+                    }
+                    acknowledged = false; // Failed deletion is safe: resend same ID.
+                }
                 Serial.printf("[WiFi] Gateway POST/ACK failed (%d); retaining event for retry.\n", status);
             }
 #endif
@@ -427,17 +441,33 @@ bool sendSensorData(
     // Do not upload stale/invalid temperature as a plausible measurement.
     if (isnan(temperature) || isnan(humidity) || millis()-lastValidDHT > 10000) return false;
     // Increase capacity if your FastAPI API needs more JSON fields.
-    StaticJsonDocument<1024> doc;
+    if (samplingPaused) return false;
+    if (outgoing.count() >= 512) {
+        Serial.println("[Storage] Buffer full/fault; old evidence retained. New samples cannot be recorded.");
+        return false;
+    }
+    // Keep larger JSON buffers on the heap; Arduino's sensor loop stack is small.
+    DynamicJsonDocument doc(1536);
 
     doc["event_id"] = String(DEVICE_ID) + "-" + bootId + "-" + String(eventSequence);
     doc["boot_id"] = bootId;
+    doc["boot_counter"] = bootCounter;
     doc["sequence"] = eventSequence;
     doc["uptime_ms"] = millis();
-    doc["firmware_version"] = "tracksure-lan-gateway-3-signed";
+    struct timeval captured;
+    gettimeofday(&captured, nullptr);
+    if (captured.tv_sec >= 1700000000) {
+        doc["captured_at_ms"] = (uint64_t)captured.tv_sec * 1000ULL + captured.tv_usec / 1000;
+        doc["clock_source"] = "sntp";
+    } else {
+        doc["captured_at_ms"] = nullptr;
+        doc["clock_source"] = "unknown";
+    }
+    doc["firmware_version"] = "tracksure-wifi-4-durable";
     doc["signature_status"] = ATECC_DEVICE_LABEL;
     doc["temperature_age_ms"] = millis()-lastValidDHT;
     doc["device_id"] = DEVICE_ID;
-    doc["shipment_code"] = SHIPMENT_CODE;
+    doc["shipment_code"] = activeShipment;
     doc["warehouse_location"] = WAREHOUSE_LOCATION;
 
     // DHT values. Null is sent until a valid DHT reading exists.
@@ -501,6 +531,7 @@ bool sendSensorData(
     // verifies SHA256("TrackSure:event:v1\\0" || record_bytes) with slot 0's
     // enrolled P-256 public key before it accepts or forwards the record.
     String signedRecord;
+    if (doc.overflowed()) return false;
     serializeJson(doc, signedRecord);
     const char domain[] = "TrackSure:event:v1";
     uint8_t digest[32];
@@ -533,7 +564,7 @@ bool sendSensorData(
     Wire.setClock(I2C_CLOCK_HZ);
 
     size_t recordB64Length = 0, signatureB64Length = 0;
-    char recordB64[1400];
+    char recordB64[2100];
     char signatureB64[96];
     if (mbedtls_base64_encode(reinterpret_cast<uint8_t*>(recordB64), sizeof(recordB64) - 1, &recordB64Length,
         reinterpret_cast<const uint8_t*>(signedRecord.c_str()), signedRecord.length()) != 0 ||
@@ -544,20 +575,22 @@ bool sendSensorData(
     }
     recordB64[recordB64Length] = '\0';
     signatureB64[signatureB64Length] = '\0';
-    StaticJsonDocument<1600> envelope;
+    DynamicJsonDocument envelope(2304);
     envelope["record_b64"] = recordB64;
     envelope["signature_b64"] = signatureB64;
     envelope["signature_algorithm"] = "ECDSA_P256_SHA256";
     envelope["key_slot"] = ATECC_KEY_SLOT;
     String requestBody;
+    if (envelope.overflowed()) return false;
     serializeJson(envelope, requestBody);
 
     OutgoingRecord record{};
     if (requestBody.length() >= sizeof(record.data)) return false;
     requestBody.toCharArray(record.data, sizeof(record.data));
     String(doc["event_id"].as<const char*>()).toCharArray(record.id, sizeof(record.id));
-    if (xQueueSend(outgoing, &record, 0) != pdTRUE) {
-        Serial.println("[Transport] Queue full; retaining sequence number for retry.");
+    snprintf(record.path, sizeof(record.path), "/queue/%016llx-%08lx.rec", bootCounter, (unsigned long)eventSequence);
+    if (!outgoing.push(record)) {
+        Serial.println("[Storage] Event not committed (full/fault); no overwrite. Sampling gap possible.");
         return false;
     }
     eventSequence++;
@@ -567,6 +600,47 @@ bool sendSensorData(
 // =====================================================
 // 11. SETUP
 // =====================================================
+
+// USB Serial commands configure/debug the device only. No event or ACK may
+// be transmitted through Serial. Assignment persists across ordinary reboot.
+void handleDebugConfiguration() {
+    static String command;
+    while (Serial.available()) {
+        char c = (char)Serial.read();
+        if (c == '\r') continue;
+        if (c != '\n') {
+            if (command.length() < 96) command += c;
+            else command = "INVALID";
+            continue;
+        }
+        command.trim();
+        if (command == "PAUSE" || command == "RESUME") {
+            bool paused = command == "PAUSE";
+            if (devicePreferences.putBool("paused", paused)) {
+                samplingPaused = paused;
+                Serial.printf("[Assignment] Sampling %s; queued delivery continues.\n", paused ? "paused" : "active");
+            }
+        } else if (command.startsWith("ASSIGN ")) {
+            String code = command.substring(7);
+            bool valid = code.length() > 0 && code.length() <= 64;
+            for (unsigned i = 0; i < code.length(); ++i) {
+                char x = code[i];
+                if (!isalnum((unsigned char)x) && x != '-' && x != '_' && x != '.' && x != ':') valid = false;
+            }
+            if (!valid || !samplingPaused || outgoing.count() != 0) {
+                Serial.println("[Assignment] Refused: PAUSE, drain queues, and use a valid shipment code.");
+            } else if (devicePreferences.putString("shipment", code)) {
+                activeShipment = code;
+                Serial.println("[Assignment] Saved. Match backend/gateway enrollment before RESUME.");
+            }
+        } else if (command == "STATUS") {
+            Serial.printf("[Assignment] %s -> %s; queue=%u; sampling=%s\n", DEVICE_ID, activeShipment.c_str(), outgoing.count(), samplingPaused ? "paused" : "active");
+        } else if (command.length()) {
+            Serial.println("[Debug] Commands: STATUS, PAUSE, ASSIGN <shipment>, RESUME. No USB event transport.");
+        }
+        command = "";
+    }
+}
 
 void setup()
 {
@@ -625,9 +699,19 @@ void setup()
     Serial.printf("[LDR] Initialized on GPIO %d\n", LDR_PIN);
 
     snprintf(bootId, sizeof(bootId), "%08lx%08lx", (unsigned long)esp_random(), (unsigned long)esp_random());
-    outgoing = xQueueCreate(32, sizeof(OutgoingRecord));
-    if (!outgoing) { Serial.println("QUEUE ALLOCATION FAILED"); while(true) delay(1000); }
-    xTaskCreate(relayTask, "gateway relay", 6144, nullptr, 1, nullptr);
+    if (!devicePreferences.begin("tracksure", false)) {
+        Serial.println("[Storage] NVS unavailable; events disabled."); while(true) delay(1000);
+    }
+    activeShipment = devicePreferences.getString("shipment", SHIPMENT_CODE);
+    samplingPaused = devicePreferences.getBool("paused", false);
+    bootCounter = devicePreferences.getULong64("bootCount", 0) + 1;
+    if (!bootCounter || !devicePreferences.putULong64("bootCount", bootCounter) || !outgoing.begin(devicePreferences)) {
+        Serial.println("[Storage] Queue unavailable; retained data NOT erased. Events disabled."); while(true) delay(1000);
+    }
+    Serial.printf("[Assignment] %s -> %s; retained events: %u; sampling %s\n", DEVICE_ID, activeShipment.c_str(), outgoing.count(), samplingPaused ? "paused" : "active");
+    if (xTaskCreate(relayTask, "gateway relay", 8192, nullptr, 1, nullptr) != pdPASS) {
+        Serial.println("[Storage] Relay unavailable; events retained."); while(true) delay(1000);
+    }
     Serial.println("Wi-Fi gateway relay ready. USB Serial is debug/flash only.");
 }
 
@@ -637,6 +721,7 @@ void setup()
 
 void loop()
 {
+    handleDebugConfiguration();
 #ifdef TRACKSURE_WIFI
     maintainWiFi();
 #endif

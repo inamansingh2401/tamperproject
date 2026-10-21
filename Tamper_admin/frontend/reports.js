@@ -3,21 +3,24 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-    initReportCharts();
+    handleGenerateReport();
     if (window.lucide) lucide.createIcons();
 });
 
-function initReportCharts() {
+let reportCharts = [];
+function initReportCharts(summary) {
+    reportCharts.forEach(chart => chart.destroy());
+    reportCharts = [];
     // Delivery Performance Chart
     const ctxPerf = document.getElementById('reportPerformanceChart')?.getContext('2d');
     if (ctxPerf) {
-        new Chart(ctxPerf, {
-            type: 'line',
+        reportCharts.push(new Chart(ctxPerf, {
+            type: 'bar',
             data: {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                labels: summary.shipment_statuses.map(item => item.status || 'Unknown'),
                 datasets: [{
-                    label: 'On-Time Deliveries (%)',
-                    data: [95, 92, 98, 94, 96, 99, 97],
+                    label: 'Stored shipment count',
+                    data: summary.shipment_statuses.map(item => item.count),
                     borderColor: '#10b981',
                     borderWidth: 2,
                     tension: 0.3,
@@ -30,21 +33,21 @@ function initReportCharts() {
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
-                    y: { min: 80, max: 100, grid: { color: 'rgba(226, 232, 240, 0.5)' }, ticks: { font: { size: 10 }, color: '#94a3b8' } }
+                    y: { beginAtZero: true, grid: { color: 'rgba(226, 232, 240, 0.5)' }, ticks: { precision: 0, font: { size: 10 }, color: '#94a3b8' } }
                 }
             }
-        });
+        }));
     }
 
     // Vehicle Utilization Chart
     const ctxUtil = document.getElementById('reportUtilizationChart')?.getContext('2d');
     if (ctxUtil) {
-        new Chart(ctxUtil, {
+        reportCharts.push(new Chart(ctxUtil, {
             type: 'bar',
             data: {
-                labels: ['Reefer Trucks', 'Security Vans', 'Heavy Cargo', 'Mini Carriers'],
+                labels: summary.vehicle_statuses.map(item => item.status || 'Unknown'),
                 datasets: [{
-                    data: [88, 75, 92, 60],
+                    data: summary.vehicle_statuses.map(item => item.count),
                     backgroundColor: '#3b82f6',
                     borderRadius: 8,
                     barThickness: 24
@@ -56,10 +59,10 @@ function initReportCharts() {
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8' } },
-                    y: { beginAtZero: true, max: 100, grid: { color: 'rgba(226, 232, 240, 0.5)' }, ticks: { font: { size: 10 }, color: '#94a3b8' } }
+                    y: { beginAtZero: true, grid: { color: 'rgba(226, 232, 240, 0.5)' }, ticks: { precision: 0, font: { size: 10 }, color: '#94a3b8' } }
                 }
             }
-        });
+        }));
     }
 }
 
@@ -67,7 +70,14 @@ async function handleGenerateReport() {
     showToast("Generating comprehensive security & telemetry report...", "info");
     try {
         const summary = await SafeTrackAPI.getReportsSummary();
-        showToast(`Report compiled: ${summary.total_shipments} shipments, ${summary.total_vehicles} vehicles, ${summary.total_alerts} incidents (${summary.compliance_percentage}% compliant)`, "success");
+        initReportCharts(summary);
+        const set = (id,value) => { const node=document.getElementById(id);if(node)node.textContent=value; };
+        set('report-temperature-percent',summary.compliance_percentage == null ? 'No readings' : `${summary.compliance_percentage}% in reference range`);
+        set('report-temperature-description',`${summary.temperature_in_range} of ${summary.temperature_readings} stored temperature readings within 2–8°C. All stored history; not a clinical or shipment-specific compliance certification.`);
+        set('report-temp-alerts',`${summary.temp_alerts} alerts`);
+        set('report-tamper-alerts',`${summary.tamper_alerts} alerts`);
+        set('report-shock-alerts',`${summary.shock_alerts} alerts`);
+        showToast(`Report: ${summary.total_shipments} shipments, ${summary.total_vehicles} vehicles, ${summary.total_alerts} stored alerts`, "success");
     } catch (e) {
         showToast("Report unavailable: the cloud request failed. Try again when connected.", "error");
     }
