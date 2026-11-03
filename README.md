@@ -1,5 +1,13 @@
 # SafeTrack
 
+- **SafeTrack:** an IoT prototype for shipment security and condition monitoring.
+- **Hardware:** ESP32-S3 sensors track temperature, humidity, motion, shock and light exposure.
+- **Evidence:** ATECC508A device signatures and a hash-linked ledger support integrity checks.
+- **Platform:** a Python gateway, FastAPI and PostgreSQL connect Admin and User dashboards.
+- **Try it:** [Live portal](https://safetrack-portal.vercel.app) (account required); setup and prototype limits below.
+
+![SafeTrack Admin Dashboard showing shipment metrics, fleet status and quick actions](docs/screenshots/admin-dashboard.png)
+
 TrackSure is a shipment-security and condition-monitoring platform. It records environmental and motion data at the parcel, cryptographically signs each accepted record, preserves a hash-linked evidence trail, and presents the verified shipment state in separate Admin and User dashboards.
 
 ## Live portal
