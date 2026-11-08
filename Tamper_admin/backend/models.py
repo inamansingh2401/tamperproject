@@ -37,7 +37,19 @@ class Device(Base):
     status = Column(String(32), default="active")
     shipment_code = Column(String(64), nullable=True)
     public_key = Column(Text, nullable=True)  # Public P-256 point, never a private key
+    key_hash = Column(String(64), nullable=True)
+    key_version = Column(Integer, nullable=False, server_default=text('1'))
+    replay_policy = Column(String(16), nullable=False, server_default=text("'legacy'"))
+    replay_boot = Column(BigInteger, nullable=False, server_default=text('0'))
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+class DeviceReplayNonce(Base):
+    __tablename__ = 'device_replay_nonces'
+    device_id = Column(String(64), primary_key=True)
+    key_version = Column(Integer, primary_key=True)
+    boot_counter = Column(BigInteger, primary_key=True)
+    sequence = Column(BigInteger, primary_key=True)
+    event_id = Column(String(128), nullable=False)
 
 class Vehicle(Base):
     __tablename__ = "vehicles"

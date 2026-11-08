@@ -53,9 +53,11 @@ class MigrationTests(unittest.TestCase):
             try:
                 legacy = MetaData()
                 for table in target_metadata.sorted_tables:
-                    if table.name == 'cache_revisions':
+                    if table.name in ('cache_revisions','device_replay_nonces'):
                         continue
                     table.to_metadata(legacy)
+                for name in ('key_hash','key_version','replay_policy','replay_boot'):
+                    legacy.tables['devices']._columns.remove(legacy.tables['devices'].c[name])
                 table = legacy.tables['sensor_events']
                 for index in list(table.indexes):
                     if index.name == 'ix_events_shipment_id':

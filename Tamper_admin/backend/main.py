@@ -18,6 +18,7 @@ from auth import IS_PRODUCTION
 from evidence import canonical, public_point, verify_envelope, make_evidence, export_record, verify_record
 from report_cache import report_cache
 from ingest_limits import from_environment as ingestion_limits_from_environment
+from device_security import check_replay, key_matches
 
 ingest_limits = ingestion_limits_from_environment()
 
@@ -90,7 +91,10 @@ def ensure_schema_migrations():
             conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_sensor_events_event_id ON sensor_events (event_id)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_events_shipment_time ON sensor_events (shipment_id, created_at, id)"))
             device_cols = {column['name'] for column in inspect(conn).get_columns('devices')}
-            for name, definition in {'shipment_code': 'VARCHAR(64)', 'public_key': 'TEXT'}.items():
+            for name, definition in {'shipment_code': 'VARCHAR(64)', 'public_key': 'TEXT',
+                    'key_hash': 'VARCHAR(64)', 'key_version': 'INTEGER NOT NULL DEFAULT 1',
+                    'replay_policy': "VARCHAR(16) NOT NULL DEFAULT 'legacy'",
+                    'replay_boot': 'BIGINT NOT NULL DEFAULT 0'}.items():
                 if name not in device_cols:
                     conn.execute(text(f'ALTER TABLE devices ADD COLUMN {name} {definition}'))
     except Exception as exc:
@@ -279,6 +283,9 @@ class GPSSensorIngestPayload(BaseModel):
     signed_envelope: Optional[dict] = None
     gateway_received_at: Optional[datetime] = None
     captured_at_ms: Optional[int] = Field(default=None, ge=1700000000000, le=4102444800000)
+    key_version: Optional[int] = Field(default=None, ge=1, le=2147483647)
+    boot_counter: Optional[int] = Field(default=None, ge=1, le=9223372036854775807)
+    sequence: Optional[int] = Field(default=None, ge=0, le=4294967295)
 
     # Flexible Light Ingest (supports both lux and raw ADC readings)
     light_lux: Optional[float] = None
@@ -1339,6 +1346,14 @@ def ingest_batch(request: Request, data: BatchIngestPayload, response: Response,
     return {'status':'partial' if denied else 'success','results':results}
 
 
+def normalized_ingest(data):
+    # Preserve pre-Phase-4 retry digests when new optional metadata is absent.
+    excluded = {'signed_envelope', 'gateway_received_at', 'device_key', 'api_key'}
+    excluded.update(name for name in ('key_version','boot_counter','sequence')
+                    if getattr(data, name, None) is None)
+    return data.model_dump(mode='json', exclude=excluded)
+
+
 def _ingest_event(request, data, x_device_key, db, commit=True):
     # 1. Physical LDR & Optical Tamper Calibration:
     # Real ESP32 circuit behavior:
@@ -1422,9 +1437,7 @@ def _ingest_event(request, data, x_device_key, db, commit=True):
         or getattr(data, "api_key", None)
     )
 
-    if not isinstance(provided_key, str) or not hmac.compare_digest(
-        provided_key.strip().encode(), device.api_key.strip().encode()
-    ):
+    if not key_matches(device, provided_key):
         # Do not put API keys, JWTs, or request headers into hosted logs.
         print(f"[AUTH ERROR] Invalid key for device {data.device_id}")
         _ingest_auth_failure(request,401,"Invalid device key")
@@ -1440,16 +1453,16 @@ def _ingest_event(request, data, x_device_key, db, commit=True):
         elif idempotency_key != data.event_id:
             raise HTTPException(409, 'Idempotency key must match the signed event ID')
 
-    source = data.model_dump(mode='json', exclude={'signed_envelope', 'gateway_received_at', 'device_key'})
+    source = normalized_ingest(data)
     ingest_digest = hashlib.sha256(canonical(source).encode()).hexdigest()
     signature_verified = None
     if data.signed_envelope:
         try:
             signed = verify_envelope(data.signed_envelope, device.public_key)
             # Reject extra unsigned sensor overrides as well as altered signed fields.
-            if any(name in signed for name in ('signed_envelope', 'gateway_received_at', 'device_key')):
+            if any(name in signed for name in ('signed_envelope', 'gateway_received_at', 'device_key', 'api_key')):
                 raise ValueError('Reserved signed field')
-            normalized_signed = GPSSensorIngestPayload.model_validate(signed).model_dump(mode='json', exclude={'signed_envelope', 'gateway_received_at', 'device_key'})
+            normalized_signed = normalized_ingest(GPSSensorIngestPayload.model_validate(signed))
             if normalized_signed != source:
                 raise ValueError('Signed payload differs from upload')
             source = signed
@@ -1487,6 +1500,7 @@ def _ingest_event(request, data, x_device_key, db, commit=True):
     if not shipment:
         raise HTTPException(status_code=404, detail="Shipment not found")
 
+    check_replay(db, device, data)
     received_at = datetime.now(timezone.utc)
     observed_at = datetime.fromtimestamp(data.captured_at_ms / 1000, timezone.utc) if data.captured_at_ms is not None and data.signed_envelope else data.gateway_received_at or received_at
     if observed_at.tzinfo is None:
