@@ -135,6 +135,8 @@ The fixture contains legacy hash-linked records without device signatures. Its m
 
 Phase 1 removes alert/shipment N+1 queries, adds cursor pagination for alerts, aggregates report scans, and adds one measured evidence-cursor index through Alembic. The [Phase 1 comparison](docs/benchmarks/phase1.md) includes full-history alert timings, slower endpoints, before/after index plans, and migration/deployment instructions.
 
+The Phase 1 report now includes five interleaved repeat runs of both versions and observed noise ranges. PostgreSQL index rollout and rollback use concurrent DDL. [Phase 2 measurements](docs/benchmarks/phase2.md) cover an opt-in Reports cache with transactional revision invalidation, admin-only hit/miss metrics, and a high-churn workload where caching did not help. Alerts and live responses stay uncached.
+
 ## License
 
 This repository is a project prototype. Add an explicit license before redistributing it outside the team.

@@ -54,6 +54,7 @@ WHERE n.nspname = 'public' AND c.relname = 'ix_events_shipment_id';
 
 - With no index and no Alembic version, verify the legacy schema using python operations/check_migration_schema.py --baseline, then run python -m alembic stamp 0001_existing_schema. Review any schema differences before stamping.
 - With revision 0001 already recorded and no index, proceed to step 4.
+- With no Alembic version but an already valid matching Phase 1 index, verify python operations/check_migration_schema.py --phase1 and then stamp 0002_evidence_cursor_index. If additional Phase 2 tables are present, follow the schema-review path in the Phase 2 guide instead of stamping over unexplained differences.
 - With revision 0002 recorded and a valid, ready index on sensor_events(shipment_id, id), the index is already installed.
 - With a valid matching index but revision 0001, a previous attempt may have finished DDL before recording its version. Verify the full definition and then stamp 0002_evidence_cursor_index. Do not rebuild that valid index merely to change migration history.
 - With an invalid or not-ready index, follow the interrupted-build recovery below before retrying. A wrong definition requires review and must not be treated as the intended index.
@@ -112,3 +113,32 @@ REVOKE ALL ON public.alembic_version FROM anon, authenticated;
 ```
 
 The Reports SET LOCAL max_parallel_workers_per_gather=0 optimization was tuned on the local Windows/PostgreSQL workload. Its benefit is unverified on hosted Supabase. Measure hosted report plans and latency before making a hosted speedup claim.
+
+## 8. Optional Phase 2 cache deployment
+
+Keep REPORT_CACHE_BACKEND=off while installing the Phase 2 release.
+
+```powershell
+python -m alembic upgrade head
+python -m alembic check
+```
+
+Require revision 0003_report_cache_revision. Before deploying the API, verify that the internal table has RLS enabled and that browser roles lack privileges.
+
+```sql
+SELECT relrowsecurity FROM pg_class WHERE oid='public.cache_revisions'::regclass;
+SELECT has_table_privilege('anon','public.cache_revisions','SELECT') AS anon_select,
+       has_table_privilege('authenticated','public.cache_revisions','SELECT') AS authenticated_select;
+```
+
+Expected values are true for relrowsecurity and false for both browser privileges. The migration owner should own the table. A separate application backend role needs reviewed table privileges and an RLS policy allowing that role to read and update the reports revision. Do not solve a backend-role permission error by granting browser-role access.
+
+Deploy the new API to every writer process with caching off. Verify ingestion, alert resolution and GET /api/admin/cache-metrics using an admin session. Then set REPORT_CACHE_BACKEND=memory and REPORT_CACHE_TTL_SECONDS=5 on the API host, redeploy and check that the metrics report enabled=true. Check a new event followed immediately by report, alert and live reads.
+
+For cache rollback, first set REPORT_CACHE_BACKEND=off and restart every worker. To remove the revision table, deploy the Phase 1 API to every writer before running the following command with this release's migration tools.
+
+```powershell
+python -m alembic downgrade 0002_evidence_cursor_index
+```
+
+This leaves the evidence index installed. If index rollback is also needed, step 6 can then remove it concurrently. See [Phase 2 workload limits and direct-write rules](benchmarks/phase2.md) before enabling caching.
