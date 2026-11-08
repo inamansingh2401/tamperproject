@@ -6,6 +6,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Index,
     String,
     Text,
 )
@@ -74,6 +75,7 @@ class Shipment(Base):
 
 class SensorEvent(Base):
     __tablename__ = "sensor_events"
+    __table_args__ = (Index('ix_events_shipment_id', 'shipment_id', 'id'),)
     id = Column(Integer, primary_key=True, index=True)
     event_id = Column(String(128), unique=True, index=True, nullable=True)
     shipment_id = Column(Integer, ForeignKey("shipments.id"), nullable=False)
