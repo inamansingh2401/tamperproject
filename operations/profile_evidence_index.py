@@ -9,8 +9,10 @@ from benchmark_api import percentile
 
 def profile(url, output, samples=30):
     validate_target(url)
-    data = json.loads((ROOT/'docs/benchmarks/phase1-run.json').read_text())
-    query = next(row for row in data['slowest_sql'] if '/evidence?' in row['endpoint'])
+    # Keep the exact pre-index statement reproducible even once it is no longer
+    # among the five slowest statements in the final API benchmark.
+    data = json.loads((ROOT/'docs/benchmarks/evidence-index.json').read_text())
+    query = {'sql': data['sql'], 'parameters': data['parameters']}
     engine = create_engine(url)
     result = {}
     try:
