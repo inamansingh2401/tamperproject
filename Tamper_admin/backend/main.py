@@ -19,6 +19,7 @@ from evidence import canonical, public_point, verify_envelope, make_evidence, ex
 from report_cache import report_cache
 from ingest_limits import from_environment as ingestion_limits_from_environment
 from device_security import check_replay, key_matches
+from chain_verifier import verify_shipment
 
 ingest_limits = ingestion_limits_from_environment()
 
@@ -511,6 +512,16 @@ def bind_device(device_id: str, payload: DeviceAssignmentPayload, db: Session = 
     db.commit()
     return {'status': 'success', 'device_id': device.device_id, 'shipment_code': device.shipment_code,
             'signature_enrolled': True, 'requires_matching_firmware_and_gateway_assignment': True}
+
+
+@app.get('/api/shipments/{code}/evidence/verify')
+def verify_stored_shipment(code: str, expected_count: Optional[int] = Query(None,ge=0),
+        expected_tail_hash: Optional[str] = Query(None,pattern=r'^[a-f0-9]{64}$'),
+        db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    shipment = db.query(Shipment).filter_by(shipment_code=code).first()
+    if not shipment:
+        raise HTTPException(404, 'Shipment not found')
+    return verify_shipment(db,shipment,expected_count,expected_tail_hash)
 
 
 @app.get('/api/shipments/{code}/evidence')
