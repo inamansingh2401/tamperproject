@@ -72,8 +72,8 @@ class QueryCountTests(unittest.TestCase):
                 db.query(Shipment).filter(Shipment.shipment_code == 'QUERY-BUDGET-NO-VEHICLE').delete()
                 db.commit()
 
-    def test_reports_preserve_aggregate_semantics_with_seven_queries(self):
-        report = self.request_with_budget('/api/reports/summary', 7)
+    def test_reports_preserve_aggregate_semantics_with_bounded_queries(self):
+        report = self.request_with_budget('/api/reports/summary', 8 if engine.dialect.name == 'postgresql' else 7)
         with SessionLocal() as db:
             temperatures = [row[0] for row in db.query(SensorEvent.temperature)]
             alerts = db.query(ShipmentAlert.alert_type, ShipmentAlert.status).all()

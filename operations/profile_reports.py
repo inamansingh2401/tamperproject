@@ -10,7 +10,7 @@ from seed_benchmark import ROOT, validate_target
 from benchmark_api import percentile
 
 
-def profile(url, output, samples=30):
+def profile(url, output, samples=30, force_serial=False):
     validate_target(url)
     os.environ.update(DATABASE_URL=url, SAFETRACK_ENV='production', DEMO_RESET='false')
     for name in ('JWT_SECRET','DEVICE_API_KEY','BOOTSTRAP_ADMIN_PASSWORD','DEMO_USER_PASSWORD'):
@@ -20,6 +20,8 @@ def profile(url, output, samples=30):
     from database import engine
     from fastapi.testclient import TestClient
     from sqlalchemy import event
+    def serial_transaction(connection):
+        connection.exec_driver_sql('SET LOCAL max_parallel_workers_per_gather = 0')
     rows, sql, pauses = [], [], []
     gc_start = {}
     def before(conn, cursor, statement, parameters, context, executemany):
@@ -33,6 +35,8 @@ def profile(url, output, samples=30):
         elif generation in gc_start:
             pauses.append((time.perf_counter()-gc_start.pop(generation))*1000)
     try:
+        if force_serial:
+            event.listen(engine, 'begin', serial_transaction)
         with TestClient(app) as client:
             login = client.post('/api/auth/login',json={'username':'admin','password':os.environ['BOOTSTRAP_ADMIN_PASSWORD']})
             login.raise_for_status()
@@ -57,9 +61,12 @@ def profile(url, output, samples=30):
                 event.remove(engine,'after_cursor_execute',after)
         result = dict(samples=rows, p50_ms=percentile([r['total_ms'] for r in rows],.5),
             p95_ms=percentile([r['total_ms'] for r in rows],.95),
+            force_serial=force_serial,
             scope='Serial local requests; GC callbacks observe process collections during each request, not exclusive route CPU time')
         Path(output).parent.mkdir(parents=True,exist_ok=True)
         Path(output).write_text(json.dumps(result,indent=2),encoding='utf-8')
         print(json.dumps(result,indent=2))
     finally:
+        if force_serial:
+            event.remove(engine, 'begin', serial_transaction)
         engine.dispose()

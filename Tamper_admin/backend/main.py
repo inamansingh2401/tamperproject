@@ -1218,6 +1218,10 @@ def change_admin_password(payload: ChangePasswordPayload, db: Session = Depends(
 
 @app.get("/api/reports/summary")
 def get_reports_summary(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    if db.bind.dialect.name == 'postgresql':
+        # Measured parallel worker startup dominates this aggregate at 100k rows.
+        # SET LOCAL ends with this request's transaction, including on errors.
+        db.execute(text('SET LOCAL max_parallel_workers_per_gather = 0'))
     total_shipments = db.query(Shipment).count()
     total_vehicles = db.query(Vehicle).count()
     total_events, valid_temperature_count, in_range_count = db.query(
