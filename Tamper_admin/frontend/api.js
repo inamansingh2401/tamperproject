@@ -346,8 +346,22 @@ const SafeTrackAPI = {
     async getAlerts() {
         if (!API_CONFIG.USE_MOCK_DATA) {
             try {
-                const res = await authFetch(`${API_CONFIG.BASE_URL}/alerts`);
-                if (res.ok) return await res.json();
+                const alerts = [];
+                let beforeId = null;
+                while (true) {
+                    const params = new URLSearchParams({ limit: '500' });
+                    if (beforeId !== null) params.set('before_id', String(beforeId));
+                    const res = await authFetch(`${API_CONFIG.BASE_URL}/alerts?${params}`);
+                    if (!res.ok) throw new Error('Failed to load alerts');
+                    const page = await res.json();
+                    alerts.push(...page);
+                    if (page.length !== 500) return alerts;
+                    const nextId = page[page.length - 1].id;
+                    if (beforeId !== null && nextId >= beforeId) {
+                        throw new Error('Alert pagination did not advance');
+                    }
+                    beforeId = nextId;
+                }
             } catch (e) {
                 if (!API_CONFIG.USE_MOCK_DATA) throw e;
                 console.warn("Backend offline, loading mock alerts", e);

@@ -5,7 +5,7 @@ import os
 import hmac
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, inspect, text
@@ -1018,12 +1018,23 @@ def delete_shipment(code: str, db: Session = Depends(get_db), current_user: User
 
 
 @app.get("/api/alerts")
-def get_alerts(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
-    alerts = db.query(ShipmentAlert).order_by(ShipmentAlert.id.desc()).all()
+def get_alerts(
+    before_id: Optional[int] = Query(None, ge=1),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    query = db.query(
+        ShipmentAlert.id, ShipmentAlert.severity, ShipmentAlert.alert_type,
+        Shipment.shipment_code, ShipmentAlert.vehicle_id, ShipmentAlert.warehouse_location,
+        ShipmentAlert.created_at, ShipmentAlert.message, ShipmentAlert.status,
+    ).outerjoin(Shipment, Shipment.id == ShipmentAlert.shipment_id)
+    if before_id is not None:
+        query = query.filter(ShipmentAlert.id < before_id)
+    alerts = query.order_by(ShipmentAlert.id.desc()).limit(limit).all()
     result = []
     for a in alerts:
-        shipment = db.query(Shipment).filter(Shipment.id == a.shipment_id).first()
-        s_code = shipment.shipment_code if shipment else "PRCL-2024-05-21-004"
+        s_code = a.shipment_code or "PRCL-2024-05-21-004"
         result.append({
             "id": a.id,
             "severity": a.severity,
