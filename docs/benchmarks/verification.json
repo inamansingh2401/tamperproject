@@ -148,5 +148,25 @@
     "../security/pip-audit-runtime-after.json",
     "../security/pnpm-audit-after.json"
   ],
-  "limits": "Ingestion five-run comparison incomplete; no hosted or hardware validation"
+  "limits": "Ingestion five-run comparison incomplete; no hosted or hardware validation",
+  "post_merge_verification": {
+    "application_commit": "01d26955ba134d1f23dee49a45f1fa3d9c844c44",
+    "teammate_commit_preserved": "7c750b80fd2513c251bf6b40882560b5f04c35ff",
+    "tests": {
+      "sqlite": {
+        "discovered": 59,
+        "skipped": 2,
+        "passed": 57
+      },
+      "postgres": {
+        "discovered": 59,
+        "skipped": 0,
+        "passed": 59
+      }
+    },
+    "browser_scripts_passed": 4,
+    "frontend_build": "passed",
+    "hosted_operations": "none",
+    "push": "not performed; hosting access and database authorization pending"
+  }
 }
