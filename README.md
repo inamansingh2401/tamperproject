@@ -127,6 +127,12 @@ Next production steps include a stable gateway discovery/address strategy, batte
 
 The repository excludes local gateway configuration, device keys, database files, private keys, `.env` files, Vercel metadata, and build output. Never commit production credentials or cryptographic key material.
 
+## Performance & Security
+
+Phase 0 provides a repeatable local PostgreSQL baseline using 100,000 synthetic telemetry events across 100 fake devices. It measures eight authenticated API routes, records p50/p95 latency and SQL calls per request, and captures EXPLAIN ANALYZE BUFFERS for the slowest SQL statements. See the [measured baseline](docs/benchmarks/baseline.md) and [reproduction instructions](docs/benchmarks/README.md).
+
+The fixture contains legacy hash-linked records without device signatures. Its measurements cover local read performance. Hosted latency, hardware signing costs and optimization gains require separate measurements. Existing JWT access checks, gateway signature checks and evidence-verification regressions remain part of the validation suite.
+
 ## License
 
 This repository is a project prototype. Add an explicit license before redistributing it outside the team.
