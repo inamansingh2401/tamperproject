@@ -9,13 +9,14 @@ from seed_benchmark import ROOT
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch-comparison',action='store_true')
+    parser.add_argument('--concurrencies',type=int,nargs='+',choices=[1,5,10,20])
     args = parser.parse_args()
     directory = ROOT/'docs/benchmarks/ingestion'
     directory.mkdir(parents=True,exist_ok=True)
     logs = ROOT/'.codex-tools/ingestion'
     logs.mkdir(parents=True,exist_ok=True)
     for run in range(1,6):
-        for concurrency in (1,5,10,20):
+        for concurrency in (args.concurrencies or ([10] if args.batch_comparison else [1,5,10,20])):
             modes = ('single','batch10') if args.batch_comparison else ('revision','bypass')
             for mode in modes:
                 output = directory/f'{mode}-c{concurrency}-r{run}.json'

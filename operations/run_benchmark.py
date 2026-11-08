@@ -29,6 +29,7 @@ def main():
     parser.add_argument('--ingest-concurrency', type=int, choices=[1,5,10,20])
     parser.add_argument('--without-revision', action='store_true', help='Ingestion benchmark process only')
     parser.add_argument('--batch-size', type=int, default=1)
+    parser.add_argument('--ingest-policy', choices=['retry','rate'])
     parser.add_argument('--output', type=Path, default=ROOT/'docs/benchmarks/baseline.md')
     args = parser.parse_args()
     if not 100000 <= args.events <= 500000:
@@ -75,7 +76,8 @@ def main():
                 print('PASS: PostgreSQL fresh upgrade/downgrade and existing-schema adoption')
             if args.ingest_concurrency:
                 from benchmark_ingestion import measure
-                measure(url,args.output,args.ingest_concurrency,not args.without_revision,batch_size=args.batch_size)
+                measure(url,args.output,args.ingest_concurrency,not args.without_revision,
+                        batch_size=args.batch_size,policy=args.ingest_policy)
             elif args.cache_mix:
                 from benchmark_cache import measure
                 measure(url,args.output,args.cache_mix,args.high_churn)
