@@ -94,3 +94,34 @@ class IngestionFeatureTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/events',json={**body,'temperature':7.},headers=headers).status_code,409)
 
 
+
+    def test_batch_retry_and_out_of_order_capture_preserve_chain(self):
+        stamp = int(datetime.now(timezone.utc).timestamp()*1000)-5000
+        newest = self.signed(captured_at_ms=stamp,temperature=6.)
+        older = self.signed(captured_at_ms=stamp-1000,temperature=3.)
+        batch = {'events':[newest,older]}
+        response = self.client.post('/api/events/batch',json=batch,headers=self.headers)
+        self.assertEqual(response.status_code,200,response.text)
+        first_hashes = [r['event_hash'] for r in response.json()['results']]
+        # Client loses/ignores the successful response, then retries identical IDs.
+        retry = self.client.post('/api/events/batch',json=batch,headers=self.headers)
+        self.assertEqual(retry.status_code,200,retry.text)
+        self.assertTrue(all(row['duplicate'] for row in retry.json()['results']))
+        self.assertEqual([r['event_hash'] for r in retry.json()['results']],first_hashes)
+        records = self.chain()
+        self.assertEqual(sum(row['event_id'] in (newest['event_id'],older['event_id']) for row in records),2)
+        with SessionLocal() as db:
+            shipment = db.get(Shipment,self.shipment_id)
+            self.assertEqual(shipment.latest_temperature,6.)
+
+    def test_bad_batch_rolls_back_and_requires_bounded_single_device_events(self):
+        first = self.signed()
+        corrupt = self.signed()
+        corrupt['temperature'] = 99.
+        response = self.client.post('/api/events/batch',json={'events':[first,corrupt]},headers=self.headers)
+        self.assertEqual(response.status_code,422,response.text)
+        with SessionLocal() as db:
+            self.assertIsNone(db.query(SensorEvent).filter(SensorEvent.event_id==first['event_id']).first())
+        for items in ([], [self.signed()]*101):
+            self.assertEqual(self.client.post('/api/events/batch',json={'events':items},headers=self.headers).status_code,422)
+        self.chain()

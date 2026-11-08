@@ -5,7 +5,7 @@ import os
 import hmac
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, inspect, or_, text
@@ -298,6 +298,10 @@ class GPSSensorIngestPayload(BaseModel):
     shock_detected: Optional[bool] = None
     mpu_available: Optional[bool] = None
     mpu_read_ok: Optional[bool] = None
+
+class BatchIngestPayload(BaseModel):
+    events: List[GPSSensorIngestPayload] = Field(min_length=1,max_length=100)
+
 
 class VehicleUpdatePayload(BaseModel):
     name: Optional[str] = None
@@ -1288,6 +1292,40 @@ def add_active_alert_once(db: Session, shipment: Shipment, vehicle_id: str, seve
 
 @app.post("/api/events")
 def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_device_key: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    return _ingest_event(request,data,x_device_key,db)
+
+
+@app.post('/api/events/batch')
+def ingest_batch(request: Request, data: BatchIngestPayload, response: Response,
+                 x_device_key: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if request.headers.get('Idempotency-Key') is not None:
+        raise HTTPException(422,'Use the signed event_id on each batch item')
+    identity = {(item.device_id,item.shipment_code) for item in data.events}
+    if len(identity)!=1 or any(item.event_id is None for item in data.events):
+        raise HTTPException(422,'A batch requires event IDs and one device/shipment pair')
+    results = []
+    try:
+        for item in data.events:
+            try:
+                result = _ingest_event(request,item,x_device_key,db,commit=False)
+                results.append({'status_code':200,**result})
+            except HTTPException as error:
+                if error.status_code != 429:
+                    raise
+                results.append({'status_code':429,'event_id':item.event_id,
+                                'retry_after':int(error.headers['Retry-After'])})
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    denied = [item for item in results if item['status_code']==429]
+    if denied:
+        response.status_code = 429 if len(denied)==len(results) else 207
+        response.headers['Retry-After'] = str(max(item['retry_after'] for item in denied))
+    return {'status':'partial' if denied else 'success','results':results}
+
+
+def _ingest_event(request, data, x_device_key, db, commit=True):
     # 1. Physical LDR & Optical Tamper Calibration:
     # Real ESP32 circuit behavior:
     # - Covering LDR (No light / container closed) produces approx 4095 ADC -> INTACT
@@ -1528,7 +1566,8 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
     })
     curr_hash = hashlib.sha256(event.evidence_payload.encode('utf-8')).hexdigest()
     event.record_hash = curr_hash
-    db.commit()
+    if commit:
+        db.commit()
     return {
         "status": "success",
         "event_id": data.event_id,
