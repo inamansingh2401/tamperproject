@@ -1,16 +1,46 @@
 # SafeTrack
 
-- **SafeTrack:** an IoT prototype for shipment security and condition monitoring.
-- **Hardware:** ESP32-S3 sensors track temperature, humidity, motion, shock and light exposure.
-- **Evidence:** ATECC508A device signatures and a hash-linked ledger support integrity checks.
-- **Platform:** a Python gateway, FastAPI and PostgreSQL connect Admin and User dashboards.
-- **Try it:** [Live portal](https://safetrack-portal.vercel.app) (account required); setup and prototype limits below.
+[![CI](https://github.com/inamansingh2401/tamperproject/actions/workflows/regression.yml/badge.svg)](https://github.com/inamansingh2401/tamperproject/actions/workflows/regression.yml)
 
-![SafeTrack Admin Dashboard showing shipment metrics, fleet status and quick actions](docs/screenshots/admin-dashboard.png)
+SafeTrack is a **team project** for shipment-condition monitoring, with ESP32-S3 sensing, ATECC508A-signed telemetry, a durable Python gateway and a PostgreSQL evidence ledger.
+
+![Admin dashboard](docs/screenshots/admin-dashboard.png)
 
 [Performance](#performance) · [Security](#security) · [Testing](#testing) · [Status and limitations](#status-and-limitations) · [Rollout](docs/ROLLOUT.md)
 
 TrackSure is a shipment-security and condition-monitoring platform. It records environmental and motion data at the parcel, cryptographically signs each accepted record, preserves a hash-linked evidence trail, and presents the verified shipment state in separate Admin and User dashboards.
+
+## Start here
+
+```text
+Sensors -> ESP32-S3 + ATECC508A -> Wi-Fi HTTP -> gateway verification
+ -> SQLite outbox -> HTTPS API -> PostgreSQL ledger -> Admin/User dashboards
+```
+
+Use [firmware/tracksure_gateway/tracksure_gateway.ino](firmware/tracksure_gateway/tracksure_gateway.ino) for canonical Wi-Fi firmware. [tracksure_final_code.ino](tracksure_final_code.ino) is historical serial firmware. Current USB Serial use is development logs and flashing.
+
+Device operation requires the connected peripherals, enrolled keys and private Wi-Fi/gateway configuration. Follow the [hardware runbook](LIVE_GATEWAY_RUNBOOK.md) and quick start below. To inspect software behavior independently:
+
+```sh
+python -m unittest discover -s tests -p "test_*.py"
+node tests/test_evidence.cjs
+node tests/test_ui_state.cjs
+node tests/test_reports.cjs
+```
+
+## Contributions and team attribution
+
+The canonical team repository is [inamansingh2401/tamperproject](https://github.com/inamansingh2401/tamperproject).
+
+Abhishek Kumar Singh's stated contributions are end-to-end architecture, ESP32-S3 firmware, the Python gateway with SQLite outbox, FastAPI/PostgreSQL backend work, Render-to-Supabase recovery/migration work, and contributions to Admin/User dashboard design. These statements do not claim sole authorship of the platform or every later change. See the [shared commit history](https://github.com/inamansingh2401/tamperproject/commits/main).
+
+## Deployment and acceptance scope
+
+- Earlier battery-powered Wi-Fi/gateway/API/dashboard operation is documented. Latest buffering/enrollment firmware has software validation; its flashing and physical interruption/reboot acceptance remain deferred.
+- Protected staged API validation is separate from promotion to the primary API alias. Later local work is not automatically part of that deployment.
+- Render-to-Supabase recovery restored a historical SQLite snapshot. Newer Render-only history recovery is incomplete; a lossless transfer is not established.
+- Signature enforcement depends on enrollment. Legacy compatibility and independent key/chain-anchor trust limits remain explicit.
+- Remote regression CI has run. Historical notes record an initial frontend lockfile failure and correction. Consult the badge and [workflow history](https://github.com/inamansingh2401/tamperproject/actions/workflows/regression.yml) for subsequent outcomes.
 
 ## Live portal
 
@@ -191,10 +221,6 @@ Current counts: 59 PostgreSQL tests passed; SQLite passed 57 with two PostgreSQL
 | Reports cache | Opt-in, OFF | Helps repeated polling in query counts; hurts high-churn reads. Redis performance is unmeasured. |
 
 See [architecture and scaling assumptions](docs/ARCHITECTURE.md), [security coverage and OWASP checklist](docs/SECURITY.md), [Phases 0–4 changelog](docs/CHANGELOG.md), and [the ordered rollout/rollback guide](docs/ROLLOUT.md). Do not describe the deployed system as secured: these are implemented controls with explicit unverified boundaries.
-
-## Team credits
-
-SafeTrack is a team project. Existing project overview, contributor attribution and Git authorship are retained. Credit shared work to its original contributors; these implementation phases do not establish sole ownership. Review [repository contributors](https://github.com/inamansingh2401/tamperproject/graphs/contributors) and commit history when describing personal contributions.
 
 ## License
 
