@@ -676,15 +676,20 @@ def remove_shipment_from_vehicle(vehicle_id: str, payload: VehicleAssignShipment
 
 @app.get("/api/shipments")
 def get_shipments(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
-    shipments = db.query(Shipment).all()
+    shipments = db.query(
+        Shipment.shipment_code, Shipment.title, Shipment.vehicle_id,
+        Vehicle.license_plate.label('vehicle_registration'),
+        Shipment.sender, Shipment.recipient_name, Shipment.origin, Shipment.destination,
+        Shipment.current_warehouse, Shipment.status, Shipment.seal_status, Shipment.health_level,
+        Shipment.latest_temperature, Shipment.latest_light, Shipment.latest_humidity, Shipment.latest_shock,
+    ).outerjoin(Vehicle, Vehicle.vehicle_code == Shipment.vehicle_id).all()
     result = []
     for s in shipments:
-        vehicle = db.query(Vehicle).filter(Vehicle.vehicle_code == s.vehicle_id).first()
         result.append({
             "id": s.shipment_code,
             "title": s.title,
             "vehicle_id": s.vehicle_id,
-            "vehicle_registration": vehicle.license_plate if vehicle else None,
+            "vehicle_registration": s.vehicle_registration,
             "sender": s.sender,
             "recipient": s.recipient_name,
             "origin": s.origin,

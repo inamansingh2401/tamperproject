@@ -57,3 +57,17 @@ class QueryCountTests(unittest.TestCase):
         self.assertEqual(len(self.client.get('/api/alerts',headers=self.headers).json()), 100)
         for query in ('limit=0','limit=501','before_id=0'):
             self.assertEqual(self.client.get('/api/alerts?'+query,headers=self.headers).status_code,422)
+
+    def test_shipments_have_constant_two_query_budget_with_missing_vehicle(self):
+        with SessionLocal() as db:
+            db.add(Shipment(shipment_code='QUERY-BUDGET-NO-VEHICLE', vehicle_id='missing'))
+            db.commit()
+        try:
+            rows = self.request_with_budget('/api/shipments', 2)
+            missing = next(row for row in rows if row['id'] == 'QUERY-BUDGET-NO-VEHICLE')
+            self.assertIsNone(missing['vehicle_registration'])
+            self.assertTrue(any(row['vehicle_registration'] for row in rows))
+        finally:
+            with SessionLocal() as db:
+                db.query(Shipment).filter(Shipment.shipment_code == 'QUERY-BUDGET-NO-VEHICLE').delete()
+                db.commit()
