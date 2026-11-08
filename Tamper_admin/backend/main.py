@@ -1377,6 +1377,17 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
         print(f"[AUTH ERROR] Invalid key for device {data.device_id}")
         raise HTTPException(status_code=401, detail="Invalid device key")
 
+    idempotency_key = request.headers.get('Idempotency-Key')
+    if idempotency_key is not None:
+        if not idempotency_key.strip() or len(idempotency_key)>128:
+            raise HTTPException(422, 'Idempotency key must contain 1-128 characters')
+        if data.event_id is None:
+            if data.signed_envelope:
+                raise HTTPException(422, 'Signed events must include their event ID inside the envelope')
+            data = data.model_copy(update={'event_id':idempotency_key})
+        elif idempotency_key != data.event_id:
+            raise HTTPException(409, 'Idempotency key must match the signed event ID')
+
     source = data.model_dump(mode='json', exclude={'signed_envelope', 'gateway_received_at', 'device_key'})
     ingest_digest = hashlib.sha256(canonical(source).encode()).hexdigest()
     signature_verified = None
@@ -1397,9 +1408,6 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
         raise HTTPException(422, 'Enrolled device requires its signed envelope')
 
     if data.event_id:
-        idempotency_key = request.headers.get('Idempotency-Key')
-        if idempotency_key and idempotency_key != data.event_id:
-            raise HTTPException(409, 'Idempotency key must match the signed event ID')
         previous_event = db.query(SensorEvent).filter(SensorEvent.event_id == data.event_id).first()
         if previous_event:
             if previous_event.device_id != device.device_id:
