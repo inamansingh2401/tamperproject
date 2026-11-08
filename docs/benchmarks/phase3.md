@@ -1,8 +1,10 @@
+> Historical phase report. Current release installation/rollback is in [ROLLOUT.md](../ROLLOUT.md); do not apply an old phase rollback to the latest schema. Final-code ingestion evidence remains incomplete.
+
 # Phase 3 ingestion measurements
 
 All results are local. Application caching was off for every capacity and policy run. No hosted database operation, deployment, ESP32 flash or physical-network measurement was performed.
 
-The measured lab stack was Windows 11, Python 3.13.7, PostgreSQL 18.6, FastAPI 0.141.1, Uvicorn 0.52.4, SQLAlchemy 2.0.52, psycopg 3.3.4, HTTPX 0.28.1 and cryptography 50.0.1. Version capture found that cryptography was outside the repository's declared >=43,<47 range. Both variants in every measured pair used the same 50.0.1 installation. The comparisons remain observations of that lab stack, not performance measurements of the declared deployment dependency range. The declared range was separately checked for functional compatibility in an isolated environment.
+The measured lab stack was Windows 11, Python 3.13.7, PostgreSQL 18.6, FastAPI 0.141.1, Uvicorn 0.52.4, SQLAlchemy 2.0.52, psycopg 3.3.4, HTTPX 0.28.1 and cryptography 50.0.1. Version capture found that cryptography was outside the repository's declared >=43,<47 range. Both variants in every measured pair used the same 50.0.1 installation. Phase 4 subsequently verified this version and updated both declarations to >=50.0.1,<51. These remain historical Phase 3 measurements; see [the incomplete final-code experiment](final-ingestion.md); current strict-device capacity is not established.
 
 ## A. Revision-row comparison
 

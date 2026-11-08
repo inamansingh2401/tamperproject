@@ -1,0 +1,4 @@
+PASS: reports use stored data, reset charts and label missing data
+PASS: browser verifier signatures, hashes, links, tamper detection, legacy labels, shipment guards and controls
+PASS: seal states and UTC presentation
+PASS: alert client follows keyset pages and propagates request failures

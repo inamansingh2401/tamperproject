@@ -30,7 +30,7 @@ FastAPI verifies the credential and an enrolled device's P-256 signature before 
 
 Hash-chain order is database insertion order. Displayed latest state uses capture/gateway time so delayed events cannot replace newer telemetry. Signed capture UTC depends on the device's clock. SNTP and unsigned gateway fallback time are not independent proof of accurate UTC. Enrollment keys and chain anchors require independent trust, and the system still has no external tail anchor.
 
-Phase 4 adds opt-in `counter_v1` devices: signed key epoch/boot counter/sequence and a transactional replay ledger, with bounded reordering and capture-age acceptance. Identical committed retries still return the original receipt; revocation/authentication remain enforced. Existing devices stay legacy until firmware/enrollment is ready. The additional write/storage cost is unmeasured; the following Phase 3 throughput results do not measure this stricter path. Gateway upload credentials now come from environment variables; see [rollout steps](security/rollout.md).
+Phase 4 adds opt-in `counter_v1` devices: signed key epoch/boot counter/sequence and a transactional replay ledger, with bounded reordering and capture-age acceptance. Identical committed retries still return the original receipt; revocation/authentication remain enforced. Existing devices stay legacy until firmware/enrollment is ready. The final replay/auth write-path cost is not yet established: [the strict-device experiment](benchmarks/final-ingestion.md) was stopped before completion. Replay-ledger storage cost remains unmeasured; historical Phase 3 results below do not measure the stricter path. Gateway upload credentials now come from environment variables; see [rollout steps](security/rollout.md).
 
 ## Write-path measurements
 
@@ -87,6 +87,6 @@ Render can also suspend free services for unusually high service-initiated inter
 
 ## Deployment and verification
 
-Keep REPORT_CACHE_BACKEND=off on every API worker. The Phase 3 endpoints require no additional migration beyond the reviewed Phase 1/2 schema. Deploy the API, retain normal single-event gateway operation and verify a signed upload, duplicate retry, ordinary 429 and authenticated critical upload.
+Keep REPORT_CACHE_BACKEND=off on every API worker. The final release requires the replay and browser-isolation migrations as well; follow [the ordered current rollout](ROLLOUT.md). Deploy the API, retain normal single-event gateway operation and verify a signed upload, duplicate retry, ordinary 429 and authenticated critical upload.
 
-Only adopt batch clients after implementing per-item acknowledgment and Retry-After handling. No ESP32 firmware change, gateway batching switch, hosted deployment or hosted benchmark was performed. The 35 existing tests are retained alongside new retry, batch and rate-limit tests. [Safe Supabase migration/backup instructions](SUPABASE_ROLLOUT.md).
+Only adopt batch clients after implementing per-item acknowledgment and Retry-After handling. No ESP32 firmware change, gateway batching switch, hosted deployment or hosted benchmark was performed. Current test counts and commands are in [the verified README](../README.md#testing) and [verification artifact](benchmarks/verification.json). [Safe Supabase migration/backup instructions](SUPABASE_ROLLOUT.md).

@@ -1,3 +1,5 @@
+> Historical index/adoption guide. For the current security release, follow [ROLLOUT.md](ROLLOUT.md) first. Do not apply an index-only downgrade from the latest schema without reviewing the security rollback implications.
+
 # Supabase rollout and rollback
 
 These are operator instructions. No hosted database commands were run while preparing or testing this guide. The concurrent-index migration was tested only on disposable local PostgreSQL.

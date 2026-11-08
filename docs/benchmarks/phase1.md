@@ -1,30 +1,14 @@
+> Historical phase report. Current release installation/rollback is in [ROLLOUT.md](../ROLLOUT.md); do not apply an old phase rollback to the latest schema. Final-code ingestion evidence remains incomplete.
+
 # Phase 1 SQL optimization
 
 The N+1 paths now use projected joins. Alerts has descending ID keyset pages, and the shared client retrieves all pages for existing dashboard filters and counts. Shipment listing uses one outer join to retain shipments with missing vehicles. Query budgets include the authenticated-user lookup.
 
-The single-run measurements below are superseded for performance claims by the five-run noise check later in this report.
+## Measurement authority
 
-## Measurements
+The five-run noise-check table below is the authority for endpoint latency claims. Original endpoint samples remain in baseline.json and phase1-run.json for reproducibility; their superseded one-run latency table is intentionally omitted. Both versions use the same deterministic synthetic dataset and request settings. SQL call budgets are structural and covered by regression tests.
 
-The table compares the original Phase 0 report with the final Phase 1 run. Both used 100,000 events, 100 synthetic devices, seed 20261108, PostgreSQL 18, concurrency one, three warmups and 30 timed requests per route. Existing startup adds ten demo shipments/devices, giving 110 total. There are 2,978 alerts. Instrumentation includes authentication, SQL, ORM work and serialization through FastAPI TestClient.
-
-Raw timings and exact plans are in [Phase 0 JSON](baseline.json), [Phase 1 JSON](phase1-run.json) and [the final query-plan report](phase1-run.md). These are separate local runs with visible timing variability, including endpoints whose handlers were untouched. Network latency, browser rendering, hardware signatures and ingestion throughput are outside the measurement.
-
-| Route | p50 before → after (ms) | p95 before → after (ms) | SQL before → after |
-| --- | ---: | ---: | ---: |
-| /api/admin/dashboard | 7.417 → 8.801 | 9.461 → 10.691 | 5 → 5 |
-| /api/vehicles | 5.820 → 7.920 | 7.325 → 12.189 | 2 → 2 |
-| /api/shipments | 47.159 → 13.730 | 63.726 → 18.896 | 112 → 2 |
-| /api/alerts | 1294.784 → 9.596 | 1633.002 → 12.079 | 2980 → 2 |
-| /api/shipments/BENCH-SHIP-00000 | 11.053 → 19.099 | 13.790 → 22.876 | 6 → 6 |
-| /api/shipments/BENCH-SHIP-00000/live | 6.834 → 8.392 | 8.653 → 10.035 | 3 → 3 |
-| /api/shipments/BENCH-SHIP-00000/evidence?limit=100 | 15.193 → 23.058 | 18.116 → 29.162 | 4 → 4 |
-| /api/reports/summary | 58.421 → 40.261 | 151.858 → 46.958 | 9 → 8 |
-| Alerts complete history | 1294.784 → 148.064 | 1633.002 → 168.404 | 2980 → 12 |
-
-The default Alerts endpoint now returns 100 records instead of the previous unbounded 2,978 records. The complete-history row includes all 2,978 records across six requests at limit=500, matching the updated JavaScript client. Its SQL count includes six authentication lookups.
-
-The shipment and report improvements retain the same logical response content. Dashboard summary and live telemetry handlers were untouched. The final run was slower for vehicles, shipment detail, live telemetry, dashboard summary and the evidence endpoint. The evidence index improved its isolated SQL plan, but the endpoint's final measured latency increased. No endpoint-level speedup is claimed for those routes.
+Alerts SQL falls from 2,980 to two calls for the default page; complete-history traversal requires 12 calls. Shipment listing falls from 112 to two. Reports falls from nine to eight on PostgreSQL. These counts are recorded in baseline.json and phase1-run.json. The default Alerts page is smaller; only complete-history traversal is a like-for-like payload comparison. Dashboard/live handlers remain unchanged.
 
 ## Report-tail investigation
 
@@ -110,9 +94,9 @@ Each cell is the median of the five run percentiles, followed by the minimum and
 | /api/reports/summary | 45.08 [44.12, 47.09] | 17.06 [16.78, 18.21] | Improvement outside observed ranges | 116.70 [112.09, 122.90] | 18.60 [18.11, 19.68] | Improvement outside observed ranges |
 | alerts_complete_history | 1038.96 [1029.53, 1140.11] | 61.27 [61.07, 62.83] | Improvement outside observed ranges | 1234.61 [1193.10, 1278.53] | 65.11 [63.76, 69.32] | Improvement outside observed ranges |
 
-The original Reports p50 pair of 58.4 to 40.3 ms is not a stable estimate of the improvement size. The repeated p50 ranges are disjoint, so the report improvement is outside the measured noise in these runs. Use the repeated medians above for a local claim. The PostgreSQL serial-execution setting was tuned on this local machine and is unverified on hosted Supabase.
+The repeated Reports p50/p95 ranges are disjoint, supporting a local improvement outside the observed noise. Use the repeated medians, not the original one-off pair. PostgreSQL serial-execution tuning was local and remains unverified on hosted Supabase.
 
-The earlier one-run before/after table is retained as historical evidence. Its Alerts full-history, shipment-list and Reports improvements are corroborated by the disjoint repeated ranges. Assess every other endpoint using the table above rather than inferring an improvement from its original pair. Default Alerts returns fewer rows, so only the complete-history row is a like-for-like content comparison.
+The complete-history Alerts comparison, shipment listing and Reports improvements are supported by disjoint repeated ranges. Untouched endpoints with overlapping ranges have no established improvement.
 
 SQL call-count reductions are structural and stable across the runs. The index timing experiment and the report profiling experiments were separate single before/after experiments. Their timing differences have no independently established run-to-run noise bound. Index rows discarded and buffer counts describe those observed plans, not an endpoint latency guarantee.
 

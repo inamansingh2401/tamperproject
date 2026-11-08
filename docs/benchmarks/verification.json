@@ -1,0 +1,152 @@
+{
+  "scope": "Local software verification; no hosted operations or credential changes",
+  "test_counts": {
+    "sqlite": {
+      "discovered": 59,
+      "passed": 57,
+      "skipped": 2
+    },
+    "postgres": {
+      "discovered": 59,
+      "passed": 59,
+      "skipped": 0
+    }
+  },
+  "browser_scripts_passed": 4,
+  "frontend_build": "passed",
+  "application_commit": "7279c7e4f0b16a6e6a436839c275390283b5b69f",
+  "runtime_audit_advisory_entries": 0,
+  "frontend_lock_audit": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0
+  },
+  "partial_ingestion": {
+    "status": "incomplete_stopped_at_user_request",
+    "completed_cases": 36,
+    "timed_events_stored": 14400,
+    "timed_errors": 0,
+    "groups": {
+      "legacy-b1-c1": {
+        "runs": 3,
+        "events_per_second": 66.24,
+        "p50_ms": 14.87,
+        "p95_ms": 17.08,
+        "sql_per_request": 10.05
+      },
+      "legacy-b1-c10": {
+        "runs": 2,
+        "events_per_second": 95.42,
+        "p50_ms": 99.0,
+        "p95_ms": 154.53,
+        "sql_per_request": 10.05
+      },
+      "legacy-b1-c20": {
+        "runs": 2,
+        "events_per_second": 46.08,
+        "p50_ms": 402.85,
+        "p95_ms": 587.84,
+        "sql_per_request": 10.05
+      },
+      "legacy-b1-c5": {
+        "runs": 2,
+        "events_per_second": 60.53,
+        "p50_ms": 84.77,
+        "p95_ms": 122.72,
+        "sql_per_request": 10.05
+      },
+      "legacy-b10-c1": {
+        "runs": 3,
+        "events_per_second": 155.72,
+        "p50_ms": 63.27,
+        "p95_ms": 71.63,
+        "sql_per_request": 81.53
+      },
+      "legacy-b10-c10": {
+        "runs": 2,
+        "events_per_second": 148.17,
+        "p50_ms": 626.93,
+        "p95_ms": 852.03,
+        "sql_per_request": 81.53
+      },
+      "legacy-b10-c20": {
+        "runs": 2,
+        "events_per_second": 116.78,
+        "p50_ms": 1515.36,
+        "p95_ms": 2232.42,
+        "sql_per_request": 81.53
+      },
+      "legacy-b10-c5": {
+        "runs": 2,
+        "events_per_second": 199.69,
+        "p50_ms": 251.97,
+        "p95_ms": 301.46,
+        "sql_per_request": 81.53
+      },
+      "counter_v1-b1-c1": {
+        "runs": 3,
+        "events_per_second": 49.07,
+        "p50_ms": 20.52,
+        "p95_ms": 25.02,
+        "sql_per_request": 13.15
+      },
+      "counter_v1-b1-c10": {
+        "runs": 2,
+        "events_per_second": 75.93,
+        "p50_ms": 126.91,
+        "p95_ms": 185.52,
+        "sql_per_request": 13.15
+      },
+      "counter_v1-b1-c20": {
+        "runs": 2,
+        "events_per_second": 39.9,
+        "p50_ms": 453.98,
+        "p95_ms": 773.9,
+        "sql_per_request": 13.15
+      },
+      "counter_v1-b1-c5": {
+        "runs": 2,
+        "events_per_second": 79.7,
+        "p50_ms": 60.88,
+        "p95_ms": 80.56,
+        "sql_per_request": 13.15
+      },
+      "counter_v1-b10-c1": {
+        "runs": 3,
+        "events_per_second": 84.74,
+        "p50_ms": 118.19,
+        "p95_ms": 129.99,
+        "sql_per_request": 112.53
+      },
+      "counter_v1-b10-c10": {
+        "runs": 2,
+        "events_per_second": 120.87,
+        "p50_ms": 825.09,
+        "p95_ms": 937.21,
+        "sql_per_request": 112.53
+      },
+      "counter_v1-b10-c20": {
+        "runs": 2,
+        "events_per_second": 74.56,
+        "p50_ms": 2295.13,
+        "p95_ms": 3075.47,
+        "sql_per_request": 112.53
+      },
+      "counter_v1-b10-c5": {
+        "runs": 2,
+        "events_per_second": 145.53,
+        "p50_ms": 352.17,
+        "p95_ms": 423.84,
+        "sql_per_request": 112.53
+      }
+    }
+  },
+  "evidence_directory": "verification/",
+  "audit_sources": [
+    "../security/pip-audit-runtime-after.json",
+    "../security/pnpm-audit-after.json"
+  ],
+  "limits": "Ingestion five-run comparison incomplete; no hosted or hardware validation"
+}

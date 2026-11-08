@@ -1,3 +1,5 @@
+> Historical deployment/backlog context. Current implemented controls, verification limits and ordered rollout are authoritative in [the README](../README.md), [security model](SECURITY.md), [changelog](CHANGELOG.md) and [rollout guide](ROLLOUT.md). Historical hosted counts/status are not current measurements.
+
 # SafeTrack engineering improvement backlog
 
 Updated 14 October 2026. Keep the core architecture: battery ESP32-S3 → Wi-Fi → laptop gateway :8765 → existing HTTPS `/api/events` → PostgreSQL → existing Admin/User dashboards. This is a scoped implementation review, not an exhaustive security audit of every repository file.

@@ -1,3 +1,5 @@
+> Historical deployment/backlog context. Current implemented controls, verification limits and ordered rollout are authoritative in [the README](../README.md), [security model](SECURITY.md), [changelog](CHANGELOG.md) and [rollout guide](ROLLOUT.md). Historical hosted counts/status are not current measurements.
+
 # Deployment guide
 
 ## Frontend

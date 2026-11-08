@@ -1,3 +1,9 @@
+# Benchmark and verification evidence
+
+Authoritative read-performance claims use [Phase 1 five-run noise results](phase1.md), not the archived one-run endpoint samples. [Phase 2](phase2.md) records cache query-count trade-offs; its timings are single-pair diagnostics. [Phase 3](phase3.md) contains completed historical ingestion comparisons before strict replay. [Final-code ingestion](final-ingestion.md) is incomplete and establishes no final overhead claim. [Current verification](verification.json) records actual test/build/audit results. Configuration constants and protocol/version identifiers are implementation facts, not measured performance.
+
+## Original baseline reproduction
+
 # Reproducing the Phase 0 baseline
 
 The original Phase 0 artifacts correspond to commit 6d108ca. Use that revision in a separate checkout to reproduce the original implementation. For the current Phase 1 implementation, run with --output docs/benchmarks/phase1-run.md and follow [the Phase 1 report](phase1.md). Supplying a separate output path preserves the original baseline.

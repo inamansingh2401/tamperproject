@@ -1,12 +1,12 @@
 # Phase 4 local verification
 
-Scope: Windows/Python 3.13.7, local SQLite and disposable loopback PostgreSQL 18.6, software-generated P-256 signatures. No hosted database, deployment, hardware-signing measurement or new ingestion performance benchmark. Caching remains OFF by default and no deployment setting was enabled.
+Scope: Windows/Python 3.13.7, local SQLite and disposable loopback PostgreSQL 18.6, software-generated P-256 signatures. No hosted database, deployment or hardware-signing measurement. The current ingestion comparison was stopped incomplete; see [partial results](../benchmarks/final-ingestion.md). Caching remains OFF by default and no deployment setting was enabled.
 
 ## A. Declared cryptography version
 
 Chose option 2: verify and support the newer version. Cryptography 50.0.1 passed the original 41 tests on SQLite and PostgreSQL before implementation; backend and gateway now both declare `>=50.0.1,<51`. Final security tests also use 50.0.1. See [the dependency decision](dependencies.md).
 
-The existing five-run interleaved Phase 3 comparison used 50.0.1: concurrency-10 median throughput 75.95 events/s single versus 141.45 events/s for batches of 10, run ranges 59.06–93.51 versus 131.68–160.19. These ranges do not overlap. This is a measurement of **Phase 3 software**, with the 100k-event local seed, not a performance measurement of the new replay ledger/security controls. Phase 4 throughput, ledger storage cost, hardware signing and hosted latency are unmeasured. Other performance claims remain subject to the Phase 1 five-run noise qualifications.
+The existing five-run interleaved Phase 3 comparison used 50.0.1: concurrency-10 median throughput 75.95 events/s single versus 141.45 events/s for batches of 10, run ranges 59.06–93.51 versus 131.68–160.19. These ranges do not overlap. This is a measurement of **Phase 3 software**, with the 100k-event local seed, not a performance measurement of the new replay ledger/security controls. The Phase 4 throughput/noise comparison remains incomplete; ledger storage cost, hardware signing and hosted latency remain unmeasured. Other performance claims remain subject to the Phase 1 five-run noise qualifications.
 
 ## B. Threat model
 

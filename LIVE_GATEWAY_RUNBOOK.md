@@ -167,4 +167,4 @@ Set these secrets in the existing backend deployment environment:
 - `DEVICE_API_KEY`: a separate random value used only by the laptop gateway
 - `DEMO_RESET=false`
 
-Put the same `DEVICE_API_KEY` value in the ignored `gateway/gateway.local.json` file as `device_key`. Never commit these values.
+Preserve the existing credential value when moving configuration: set it privately in the gateway environment under `SAFETRACK_DEVICE_KEY_GATEWAY`, or set a dedicated `device_key_env` reference to another `SAFETRACK_DEVICE_KEY_...` variable. JSON must not contain the credential. This configuration move does not rotate login/account credentials. See [the current ordered rollout](docs/ROLLOUT.md) before enrollment or deployment.

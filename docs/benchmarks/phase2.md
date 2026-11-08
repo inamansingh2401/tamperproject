@@ -1,3 +1,5 @@
+> Historical phase report. Current release installation/rollback is in [ROLLOUT.md](../ROLLOUT.md); do not apply an old phase rollback to the latest schema. Final-code ingestion evidence remains incomplete.
+
 # Phase 2 report caching
 
 Current Phase 3 operating decision: keep REPORT_CACHE_BACKEND=off everywhere. The single-pair cache timings below are historical diagnostics, not five-run validated improvement claims. Do not enable caching as part of the current rollout.
@@ -23,7 +25,7 @@ ON CONFLICT (namespace)
 DO UPDATE SET generation = cache_revisions.generation + 1;
 ```
 
-The revision upsert is one additional statement for each application data-writing commit, including workers with cache reads disabled. This supports a mixed rollout without silently losing invalidations. It also introduces a shared-row write lock. High-concurrency contention and ingestion capacity were not measured.
+The revision upsert is one additional statement for each application data-writing commit, including workers with cache reads disabled. This supports a mixed rollout without silently losing invalidations. It also introduces a shared-row write lock. The later Phase 3 five-run comparison did not establish revision-row overhead outside observed noise; final strict-device ingestion is measured separately in [the final report](final-ingestion.md). No hosted contention result is claimed.
 
 ## Local polling experiment
 

@@ -9,16 +9,7 @@ Synthetic legacy-format, hash-linked events with exposure, shock and temperature
 Serial FastAPI TestClient requests, concurrency 1, three warmups and 30 timed requests per endpoint. JWT authentication, serialization and SQL included. Login excluded. Local PostgreSQL, warm caches, no network/TLS/browser rendering. p50/p95 use nearest-rank percentiles.
 API startup also adds its existing demo shipments/devices/vehicles. The seeded benchmark shipment is used for detail/live/evidence reads.
 
-| Endpoint | p50 ms | p95 ms | DB calls/request | Response bytes |
-| --- | ---: | ---: | ---: | ---: |
-| /api/admin/dashboard | 8.801 | 10.691 | 5 | 127 |
-| /api/vehicles | 7.92 | 12.189 | 2 | 35584 |
-| /api/shipments | 13.73 | 18.896 | 2 | 56816 |
-| /api/alerts | 9.596 | 12.079 | 2 | 24432 |
-| /api/shipments/BENCH-SHIP-00000 | 19.099 | 22.876 | 6 | 26201 |
-| /api/shipments/BENCH-SHIP-00000/live | 8.392 | 10.035 | 3 | 841 |
-| /api/shipments/BENCH-SHIP-00000/evidence?limit=100 | 23.058 | 29.162 | 4 | 70716 |
-| /api/reports/summary | 40.261 | 46.958 | 8 | 644 |
+Endpoint one-run latency tables are superseded by [the five-run noise check](phase1.md). Original samples remain in the adjacent JSON artifact. The SQL plans below are historical diagnostic evidence, not new latency guarantees.
 
 ## Slow SQL plans
 
