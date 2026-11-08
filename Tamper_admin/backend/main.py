@@ -1591,8 +1591,20 @@ def _ingest_event(request, data, x_device_key, db, commit=True):
             original_shipment = db.get(Shipment, previous_event.shipment_id)
             if not original_shipment or original_shipment.shipment_code != data.shipment_code:
                 raise HTTPException(409, 'Event identity belongs to a different shipment')
-            if previous_event.evidence_payload and json.loads(previous_event.evidence_payload).get('ingest_digest') != ingest_digest:
-                raise HTTPException(409, 'Event identity conflict: readings changed')
+            if previous_event.evidence_payload:
+                proof = json.loads(previous_event.evidence_payload)
+                matching = proof.get('ingest_digest') == ingest_digest
+                # Pre-Phase-4 unsigned body api_key was included in the digest.
+                # Compare the readings without that obsolete credential; never
+                # rewrite historical evidence or silently accept changed data.
+                if not matching and not data.signed_envelope and not proof.get('signed_envelope') and 'api_key' in proof.get('source',{}):
+                    try:
+                        old_source = normalized_ingest(GPSSensorIngestPayload.model_validate(proof['source']))
+                        matching = hashlib.sha256(canonical(old_source).encode()).hexdigest() == ingest_digest
+                    except ValueError:
+                        pass
+                if not matching:
+                    raise HTTPException(409, 'Event identity conflict: readings changed')
             return {
                 "status": "success",
                 "event_id": data.event_id,

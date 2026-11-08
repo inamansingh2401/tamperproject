@@ -67,3 +67,26 @@ class IngestValidationTests(unittest.TestCase):
         response = self.client.get('/api/shipments')
         self.assertEqual(response.headers['x-frame-options'],'DENY')
         self.assertEqual(response.headers['x-content-type-options'],'nosniff')
+
+    def test_legacy_body_key_retry_remains_idempotent_without_rewriting_history(self):
+        import hashlib
+        from evidence import canonical
+        body = {**self.body,'api_key':os.environ['DEVICE_API_KEY']}
+        self.assertEqual(self.client.post('/api/events',json=body).status_code,200)
+        with SessionLocal() as db:
+            row = db.query(SensorEvent).filter_by(event_id=self.body['event_id']).one()
+            proof = json.loads(row.evidence_payload)
+            # Reconstruct the old code's proof/digest, including its credential.
+            proof['source']['api_key'] = body['api_key']
+            proof['ingest_digest'] = hashlib.sha256(canonical(proof['source']).encode()).hexdigest()
+            row.evidence_payload = canonical(proof)
+            row.record_hash = hashlib.sha256(row.evidence_payload.encode()).hexdigest()
+            historic_payload = row.evidence_payload
+            db.commit()
+        response = self.client.post('/api/events',json=body)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertTrue(response.json()['duplicate'])
+        self.assertEqual(self.client.post('/api/events',json={**body,'temperature':5.}).status_code,409)
+        with SessionLocal() as db:
+            row = db.query(SensorEvent).filter_by(event_id=self.body['event_id']).one()
+            self.assertEqual(row.evidence_payload,historic_payload)
