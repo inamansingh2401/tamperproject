@@ -6,11 +6,7 @@ const source = fs.readFileSync(require('node:path').join(__dirname, '../Tamper_a
 (async () => {
     const urls = [];
     const first = Array.from({length: 500}, (_, i) => ({id: 1000-i}));
-    const context = {window: {}, console, URLSearchParams,
-        authFetch: async url => {
-            urls.push(url);
-            return {ok: true, json: async () => urls.length === 1 ? first : [{id: 499}]};
-        }};
+    const context = {window: {}, console, URLSearchParams};
     vm.createContext(context);
     vm.runInContext(source, context);
     context.authFetch = async url => {
@@ -23,5 +19,7 @@ const source = fs.readFileSync(require('node:path').join(__dirname, '../Tamper_a
     assert.equal(rows[500].id, 499);
     context.authFetch = async () => ({ok: false});
     await assert.rejects(context.window.SafeTrackAPI.getAlerts(), /Failed to load alerts/);
+    context.authFetch = async () => ({ok: true, json: async () => first});
+    await assert.rejects(context.window.SafeTrackAPI.getAlerts(), /did not advance/);
     console.log('PASS: alert client follows keyset pages and propagates request failures');
 })().catch(error => { console.error(error); process.exitCode = 1; });

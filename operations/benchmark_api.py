@@ -35,6 +35,7 @@ def benchmark(url, output, samples=30, seed_metadata=None):
     from sqlalchemy import event, text
     measurements = []
     captured = []
+    alert_history = None
     def before(conn, cursor, statement, parameters, context, executemany):
         context.benchmark_started = time.perf_counter()
     def after(conn, cursor, statement, parameters, context, executemany):
@@ -73,12 +74,45 @@ def benchmark(url, output, samples=30, seed_metadata=None):
                         response_bytes=sizes[0], raw_ms=latencies))
                     # Retain distinct exact SQL and bindings from each endpoint.
                     measurements[-1]['sql'] = list(captured)
+                # Preserve a full-history comparison: the new default alert
+                # page is smaller than Phase 0's unbounded response.
+                history_ms, history_calls = [], []
+                for attempt in range(samples + 3):
+                    captured.clear()
+                    before_id = None
+                    ids = []
+                    started = time.perf_counter()
+                    while True:
+                        params = {'limit': 500}
+                        if before_id is not None:
+                            params['before_id'] = before_id
+                        response = client.get('/api/alerts',params=params,headers=headers)
+                        response.raise_for_status()
+                        page = response.json()
+                        ids.extend(row['id'] for row in page)
+                        if len(page) != 500:
+                            break
+                        next_id = page[-1]['id']
+                        if before_id is not None and next_id >= before_id:
+                            raise RuntimeError('Cursor did not advance')
+                        before_id = next_id
+                    elapsed = (time.perf_counter()-started)*1000
+                    if len(ids) != len(set(ids)):
+                        raise RuntimeError('Alert pagination returned duplicates')
+                    if attempt >= 3:
+                        history_ms.append(elapsed)
+                        history_calls.append(len(captured))
+                alert_history = dict(p50_ms=percentile(history_ms,.5),p95_ms=percentile(history_ms,.95),
+                    mean_db_calls=statistics.mean(history_calls), rows=len(ids),raw_ms=history_ms,
+                    description='Complete alert history via limit=500 descending keyset pages, including authentication per page')
             finally:
                 event.remove(engine, 'before_cursor_execute', before)
                 event.remove(engine, 'after_cursor_execute', after)
         queries = {}
         for item in measurements:
             for sql, params, elapsed in item.pop('sql'):
+                if not sql.lstrip().upper().startswith('SELECT'):
+                    continue
                 entry = queries.setdefault(sql, dict(params=params, times=[], path=item['path']))
                 entry['times'].append(elapsed)
         plans = []
@@ -88,6 +122,10 @@ def benchmark(url, output, samples=30, seed_metadata=None):
                       for table in ('sensor_events','devices','shipments','shipment_alerts')}
             size = conn.execute(text('SELECT pg_database_size(current_database())')).scalar()
             for sql, detail in sorted(queries.items(), key=lambda pair: statistics.mean(pair[1]['times']), reverse=True)[:5]:
+                if detail['path'] == '/api/reports/summary':
+                    conn.exec_driver_sql('SET LOCAL max_parallel_workers_per_gather = 0')
+                else:
+                    conn.exec_driver_sql('SET LOCAL max_parallel_workers_per_gather = DEFAULT')
                 plan = conn.exec_driver_sql('EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) '+sql, detail['params']).scalar()
                 plans.append(dict(endpoint=detail['path'], sql=sql, parameters=detail['params'],
                     mean_execute_ms=statistics.mean(detail['times']), plan=plan))
@@ -100,10 +138,11 @@ def benchmark(url, output, samples=30, seed_metadata=None):
             versions={p:importlib.metadata.version(p) for p in ('fastapi','sqlalchemy','psycopg','httpx')},
             samples=samples, concurrency=1, warmups=3, counts=counts, database_bytes=size,
             seed=seed_metadata, endpoints=measurements, slowest_sql=plans)
+        result['alert_history'] = alert_history
         output = Path(output)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.with_suffix('.json').write_text(json.dumps(result, indent=2, default=str), encoding='utf-8')
-        rows = ['# Phase 0 baseline', '', f"Measured {result['timestamp_utc']} at application commit {result['commit']}.",
+        rows = ['# API benchmark run', '', f"Measured {result['timestamp_utc']} at application commit {result['commit']}.",
                 '', f"Environment: {result['platform']}, Python {result['python']}, {version}.",
                 f"Dataset counts: {counts}. Database bytes including indexes: {size:,}.",
                 '', 'Synthetic legacy-format, hash-linked events with exposure, shock and temperature excursions. No hardware signatures. Bulk seeding bypasses ingestion.',
@@ -119,7 +158,7 @@ def benchmark(url, output, samples=30, seed_metadata=None):
                      '', '```sql', plan['sql'], '```', '', 'Parameters: '+json.dumps(plan['parameters'],default=str),
                      '', '```json', json.dumps(plan['plan'],indent=2), '```']
         rows += ['', '## Interpretation and next comparison', '',
-                 'These are baseline measurements. No improvement or hosted capacity claim is established. The static admin dashboard loads vehicles, shipments and alerts separately. Its list endpoints must be evaluated together when optimizing query count. Live telemetry uses an existing shipment/time index and evidence already has cursor pagination.',
+                 'These are local measurements. The static admin dashboard loads vehicles, shipments and alerts separately. Its list endpoints must be evaluated together when optimizing query count. Live telemetry uses an existing shipment/time index and evidence already has cursor pagination.',
                  'Repeat the same event count, device count, seed, warmups and samples after each change. Raw timings and query plans are in the adjacent JSON file. Measure ingestion and signature-heavy version-2 evidence separately before making claims about those paths.']
         output.write_text('\n'.join(rows)+'\n',encoding='utf-8')
         print(json.dumps(dict(counts=counts, endpoints=measurements, report=str(output)),indent=2))

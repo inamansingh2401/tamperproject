@@ -86,3 +86,19 @@ class QueryCountTests(unittest.TestCase):
         for key, words in [('temp_alerts', ['temp']), ('tamper_alerts', ['tamper','seal']),
                            ('shock_alerts', ['shock','impact'])]:
             self.assertEqual(report[key], sum(any(word in row.alert_type.lower() for word in words) for row in alerts))
+
+    def test_reports_include_temperature_boundaries_and_exclude_nulls(self):
+        with SessionLocal() as db:
+            shipment = db.query(Shipment).first()
+            rows = [dict(event_id=f'query-budget-temp-{i}', shipment_id=shipment.id,
+                         device_id='QUERY-BUDGET', temperature=value,
+                         previous_hash='0'*64, record_hash='0'*64)
+                    for i, value in enumerate([None, 2.0, 8.0, 8.01, 1.99])]
+            db.execute(SensorEvent.__table__.insert(), rows)
+            db.commit()
+        try:
+            self.test_reports_preserve_aggregate_semantics_with_bounded_queries()
+        finally:
+            with SessionLocal() as db:
+                db.query(SensorEvent).filter(SensorEvent.device_id == 'QUERY-BUDGET').delete()
+                db.commit()
