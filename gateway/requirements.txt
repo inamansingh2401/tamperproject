@@ -1,2 +1,3 @@
 httpx>=0.27,<1
+certifi>=2026.10.18
 cryptography>=50.0.1,<51

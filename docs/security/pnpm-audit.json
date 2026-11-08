@@ -1,0 +1,66 @@
+{
+  "advisories": {
+    "1241209": {
+      "findings": [
+        {
+          "version": "1.2.1",
+          "paths": [
+            ".>tailwindcss>postcss>source-map-js",
+            ".>tailwindcss>postcss-import>postcss>source-map-js",
+            ".>tailwindcss>postcss-js>postcss>source-map-js",
+            ".>tailwindcss>postcss-load-config>postcss>source-map-js",
+            ".>tailwindcss>postcss-nested>postcss>source-map-js"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1241209,
+      "title": "source-map-js allows event-loop denial of service through indexed source-map section offsets",
+      "module_name": "source-map-js",
+      "vulnerable_versions": ">=1.0.0 <1.2.2",
+      "patched_versions": ">=1.2.2",
+      "severity": "high",
+      "cwe": "CWE-1284",
+      "github_advisory_id": "GHSA-68fv-2mgg-jv7q",
+      "url": "https://github.com/advisories/GHSA-68fv-2mgg-jv7q"
+    },
+    "1243379": {
+      "findings": [
+        {
+          "version": "6.1.4",
+          "paths": [
+            ".>tailwindcss>postcss-nested>postcss-selector-parser",
+            ".>tailwindcss>postcss-selector-parser"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "id": 1243379,
+      "title": "PostCSS: Quadratic complexity in flat selector parsing allows CPU exhaustion",
+      "module_name": "postcss-selector-parser",
+      "vulnerable_versions": "<6.1.5",
+      "patched_versions": ">=6.1.5",
+      "severity": "moderate",
+      "cwe": "CWE-400, CWE-407",
+      "github_advisory_id": "GHSA-rj75-hqrm-r3gf",
+      "url": "https://github.com/advisories/GHSA-rj75-hqrm-r3gf"
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 1,
+      "high": 1,
+      "critical": 0
+    },
+    "dependencies": 0,
+    "devDependencies": 73,
+    "optionalDependencies": 1,
+    "totalDependencies": 73
+  }
+}
