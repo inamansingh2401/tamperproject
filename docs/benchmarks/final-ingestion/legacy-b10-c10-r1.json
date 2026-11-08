@@ -1,0 +1,230 @@
+{
+  "concurrency": 10,
+  "revision_enabled": true,
+  "cache_backend": "off",
+  "device_policy": "legacy",
+  "dependency_versions": {
+    "cryptography": "50.0.1",
+    "PyJWT": "2.15.1",
+    "fastapi": "0.141.1",
+    "sqlalchemy": "2.0.52",
+    "psycopg": "3.3.4"
+  },
+  "initial_events": 100020,
+  "events_requested": 400,
+  "events_stored": 400,
+  "batch_size": 10,
+  "requests": 40,
+  "elapsed_seconds": 2.8048836999805644,
+  "events_per_second": 142.60840832822112,
+  "p50_ms": 633.4621999994852,
+  "p95_ms": 956.5269000013359,
+  "error_rate": 0.0,
+  "sql_calls": 3261,
+  "sensor_relation_growth_bytes": 1794048,
+  "sql_per_request": 81.525,
+  "revision_writes": 40,
+  "raw_requests": [
+    {
+      "ms": 528.6365000065416,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 723.7218000227585,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 611.7909000022337,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 587.9847000469454,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 551.8697000225075,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 715.5569000169635,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 629.7807999653742,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 633.4621999994852,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 840.0347999995574,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 639.9611000088044,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 616.1326000001281,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 573.0232000350952,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 956.5269000013359,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 668.8250000006519,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 722.1771000185981,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 445.86050003999844,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 928.0786000308581,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 670.632699970156,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 727.7036999585107,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 469.4658999796957,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 886.3721999805421,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 567.8466999670491,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 630.7348000118509,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 596.6142000397667,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 967.7717000013217,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 604.8821000149474,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 595.3006999916397,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 576.2265000375919,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 973.1958000338636,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 627.3077999940142,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 668.3116999920458,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 513.1233999854885,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 904.7543000197038,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 664.390399993863,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 667.9069999954663,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 518.6147000058554,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 934.1189000406303,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 693.9596000011079,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 662.9250000114553,
+      "status": 200,
+      "accepted": 10
+    },
+    {
+      "ms": 501.6827000072226,
+      "status": 200,
+      "accepted": 10
+    }
+  ],
+  "scope": "Real loopback HTTP, one Uvicorn process, PostgreSQL pool 5+5, software signatures verified by API; signing excluded; 100k seed plus 20 warmups"
+}

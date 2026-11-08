@@ -1,5 +1,7 @@
 """Actual loopback HTTP ingestion, software P-256 signatures and local PostgreSQL."""
 import base64
+import hashlib
+import importlib.metadata
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
@@ -20,7 +22,7 @@ from seed_benchmark import ROOT, validate_target
 from benchmark_api import percentile
 
 
-def measure(url, output, concurrency=1, revision=True, events=400, batch_size=1, policy=None):
+def measure(url, output, concurrency=1, revision=True, events=400, batch_size=1, policy=None, strict=False):
     validate_target(url)
     os.environ.update(DATABASE_URL=url, SAFETRACK_ENV='production', REPORT_CACHE_BACKEND='off', DEMO_RESET='false')
     for name in ('JWT_SECRET','DEVICE_API_KEY','BOOTSTRAP_ADMIN_PASSWORD','DEMO_USER_PASSWORD'):
@@ -38,13 +40,16 @@ def measure(url, output, concurrency=1, revision=True, events=400, batch_size=1,
         for i,key in enumerate(keys):
             public = key.public_key().public_bytes(serialization.Encoding.X962,serialization.PublicFormat.UncompressedPoint).hex()
             connection.execute(Device.__table__.update().where(Device.device_id==f'BENCH-DEVICE-{i:05d}')
-                .values(status='active',api_key=os.environ['DEVICE_API_KEY'],public_key=public))
+                .values(status='active',api_key='' if strict else os.environ['DEVICE_API_KEY'],public_key=public,
+                    key_hash=hashlib.sha256(os.environ['DEVICE_API_KEY'].encode()).hexdigest() if strict else None,
+                    replay_policy='counter_v1' if strict else 'legacy',key_version=1,replay_boot=0))
     captured_ms = int(time.time()*1000)-10000
     def envelope(number, device, prefix, critical=None):
         payload = dict(event_id=f'{prefix}-{number:07d}',device_id=f'BENCH-DEVICE-{device:05d}',
             shipment_code=f'BENCH-SHIP-{device:05d}',temperature=4.5,humidity=45.,
             ldr_raw=0 if (number%20==0 if critical is None else critical) else 3900,
-            captured_at_ms=captured_ms+number,sequence=number,boot_id='synthetic-ingestion')
+            captured_at_ms=captured_ms+number,sequence=number,boot_id='synthetic-ingestion',
+            key_version=1,boot_counter=1 if prefix=='warmup' else 2)
         raw = json.dumps(payload,separators=(',',':')).encode()
         signature = keys[device].sign(b'TrackSure:event:v1\0'+raw,ec.ECDSA(hashes.SHA256()))
         r,s = utils.decode_dss_signature(signature)
@@ -124,6 +129,8 @@ def measure(url, output, concurrency=1, revision=True, events=400, batch_size=1,
         accepted = sum(row['accepted'] for row in rows)
         assert final-initial == accepted, 'Acknowledgments differ from durable event count'
         result = dict(concurrency=concurrency,revision_enabled=revision,cache_backend='off',
+            device_policy='counter_v1' if strict else 'legacy',
+            dependency_versions={name:importlib.metadata.version(name) for name in ('cryptography','PyJWT','fastapi','sqlalchemy','psycopg')},
             initial_events=initial,events_requested=events,events_stored=final-initial,
             batch_size=batch_size,requests=len(rows),elapsed_seconds=elapsed,events_per_second=accepted/elapsed,
             p50_ms=percentile([r['ms'] for r in rows],.5),p95_ms=percentile([r['ms'] for r in rows],.95),
