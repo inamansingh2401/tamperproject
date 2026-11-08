@@ -1039,7 +1039,7 @@ def get_alerts(
     alerts = query.order_by(ShipmentAlert.id.desc()).limit(limit).all()
     result = []
     for a in alerts:
-        s_code = a.shipment_code or "PRCL-2024-05-21-004"
+        s_code = a.shipment_code if a.shipment_code is not None else "PRCL-2024-05-21-004"
         result.append({
             "id": a.id,
             "severity": a.severity,
