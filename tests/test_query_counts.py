@@ -5,7 +5,7 @@ import test_security as fixture
 from fastapi.testclient import TestClient
 from sqlalchemy import event
 from database import engine, SessionLocal
-from models import Shipment, ShipmentAlert
+from models import SensorEvent, Shipment, ShipmentAlert
 
 
 class QueryCountTests(unittest.TestCase):
@@ -71,3 +71,18 @@ class QueryCountTests(unittest.TestCase):
             with SessionLocal() as db:
                 db.query(Shipment).filter(Shipment.shipment_code == 'QUERY-BUDGET-NO-VEHICLE').delete()
                 db.commit()
+
+    def test_reports_preserve_aggregate_semantics_with_seven_queries(self):
+        report = self.request_with_budget('/api/reports/summary', 7)
+        with SessionLocal() as db:
+            temperatures = [row[0] for row in db.query(SensorEvent.temperature)]
+            alerts = db.query(ShipmentAlert.alert_type, ShipmentAlert.status).all()
+        valid = [value for value in temperatures if value is not None]
+        self.assertEqual(report['total_events'], len(temperatures))
+        self.assertEqual(report['temperature_readings'], len(valid))
+        self.assertEqual(report['temperature_in_range'], sum(2 <= value <= 8 for value in valid))
+        self.assertEqual(report['total_alerts'], len(alerts))
+        self.assertEqual(report['active_alerts_count'], sum(row.status == 'Active' for row in alerts))
+        for key, words in [('temp_alerts', ['temp']), ('tamper_alerts', ['tamper','seal']),
+                           ('shock_alerts', ['shock','impact'])]:
+            self.assertEqual(report[key], sum(any(word in row.alert_type.lower() for word in words) for row in alerts))

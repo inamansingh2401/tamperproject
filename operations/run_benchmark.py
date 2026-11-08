@@ -19,6 +19,7 @@ def main():
     parser.add_argument('--events', type=int, default=100000)
     parser.add_argument('--devices', type=int, default=100)
     parser.add_argument('--samples', type=int, default=30)
+    parser.add_argument('--reports-profile', action='store_true')
     parser.add_argument('--output', type=Path, default=ROOT/'docs/benchmarks/baseline.md')
     args = parser.parse_args()
     if not 100000 <= args.events <= 500000:
@@ -49,7 +50,11 @@ def main():
             url = URL.create('postgresql+psycopg', username='safetrack_benchmark',
                 password=password, host='127.0.0.1', port=args.port, database='safetrack_benchmark').render_as_string(hide_password=False)
             metadata = seed(url, args.events, args.devices)
-            benchmark(url, args.output, args.samples, metadata)
+            if args.reports_profile:
+                from profile_reports import profile
+                profile(url, args.output, args.samples)
+            else:
+                benchmark(url, args.output, args.samples, metadata)
         finally:
             if started:
                 run([str(args.pg_bin/'pg_ctl.exe'), '-D', str(data), '-m', 'fast', '-w', 'stop'], env)

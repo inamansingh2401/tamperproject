@@ -8,7 +8,7 @@ from typing import List, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import func, inspect, text
+from sqlalchemy import func, inspect, or_, text
 from sqlalchemy.orm import Session
 
 from database import Base, SessionLocal, engine, get_db
@@ -1220,15 +1220,19 @@ def change_admin_password(payload: ChangePasswordPayload, db: Session = Depends(
 def get_reports_summary(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     total_shipments = db.query(Shipment).count()
     total_vehicles = db.query(Vehicle).count()
-    total_events = db.query(SensorEvent).count()
-    alerts = db.query(ShipmentAlert).all()
-    active_alerts = [a for a in alerts if a.status == "Active"]
-
-    temp_alerts = len([a for a in alerts if "temp" in a.alert_type.lower()])
-    tamper_alerts = len([a for a in alerts if "tamper" in a.alert_type.lower() or "seal" in a.alert_type.lower()])
-    shock_alerts = len([a for a in alerts if "shock" in a.alert_type.lower() or "impact" in a.alert_type.lower()])
-    valid_temperature_count = db.query(func.count(SensorEvent.id)).filter(SensorEvent.temperature.isnot(None)).scalar()
-    in_range_count = db.query(func.count(SensorEvent.id)).filter(SensorEvent.temperature.between(2.0,8.0)).scalar()
+    total_events, valid_temperature_count, in_range_count = db.query(
+        func.count(SensorEvent.id),
+        func.count(SensorEvent.id).filter(SensorEvent.temperature.isnot(None)),
+        func.count(SensorEvent.id).filter(SensorEvent.temperature.between(2.0, 8.0)),
+    ).one()
+    alert_type = func.lower(ShipmentAlert.alert_type)
+    total_alerts, active_alerts_count, temp_alerts, tamper_alerts, shock_alerts = db.query(
+        func.count(ShipmentAlert.id),
+        func.count(ShipmentAlert.id).filter(ShipmentAlert.status == 'Active'),
+        func.count(ShipmentAlert.id).filter(alert_type.contains('temp')),
+        func.count(ShipmentAlert.id).filter(or_(alert_type.contains('tamper'), alert_type.contains('seal'))),
+        func.count(ShipmentAlert.id).filter(or_(alert_type.contains('shock'), alert_type.contains('impact'))),
+    ).one()
     shipment_statuses = [{'status': status, 'count': count} for status,count in
                          db.query(Shipment.status,func.count(Shipment.id)).group_by(Shipment.status).order_by(Shipment.status)]
     vehicle_statuses = [{'status': status, 'count': count} for status,count in
@@ -1238,8 +1242,8 @@ def get_reports_summary(db: Session = Depends(get_db), current_user: User = Depe
         "total_shipments": total_shipments,
         "total_vehicles": total_vehicles,
         "total_events": total_events,
-        "total_alerts": len(alerts),
-        "active_alerts_count": len(active_alerts),
+        "total_alerts": total_alerts,
+        "active_alerts_count": active_alerts_count,
         "compliance_percentage": round(100*in_range_count/valid_temperature_count,2) if valid_temperature_count else None,
         "temperature_readings": valid_temperature_count,
         "temperature_in_range": in_range_count,

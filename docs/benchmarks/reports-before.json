@@ -1,0 +1,217 @@
+{
+  "samples": [
+    {
+      "total_ms": 43.912800028920174,
+      "sql_ms": 25.147499924059957,
+      "sql_calls": 9,
+      "gc_ms": 1.0667000897228718,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 41.92110005533323,
+      "sql_ms": 24.818400153890252,
+      "sql_calls": 9,
+      "gc_ms": 1.522699953056872,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 41.82809998746961,
+      "sql_ms": 24.673399864695966,
+      "sql_calls": 9,
+      "gc_ms": 1.5064999461174011,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 42.31150000123307,
+      "sql_ms": 24.574199866037816,
+      "sql_calls": 9,
+      "gc_ms": 1.3078997726552188,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 41.28170001786202,
+      "sql_ms": 24.453099875245243,
+      "sql_calls": 9,
+      "gc_ms": 1.0202001431025565,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 42.57940000388771,
+      "sql_ms": 24.94559990009293,
+      "sql_calls": 9,
+      "gc_ms": 1.564099860843271,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 82.1775000076741,
+      "sql_ms": 24.41509999334812,
+      "sql_calls": 9,
+      "gc_ms": 41.51730000739917,
+      "gc_collections": 16
+    },
+    {
+      "total_ms": 41.546599997673184,
+      "sql_ms": 24.697099928744137,
+      "sql_calls": 9,
+      "gc_ms": 1.23000011080876,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 42.04909998225048,
+      "sql_ms": 25.180899945553392,
+      "sql_calls": 9,
+      "gc_ms": 1.0065999813377857,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 42.447199986781925,
+      "sql_ms": 25.030399905517697,
+      "sql_calls": 9,
+      "gc_ms": 1.5408999752253294,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 42.457599949557334,
+      "sql_ms": 24.678600078914315,
+      "sql_calls": 9,
+      "gc_ms": 1.5331999165937304,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 43.43449999578297,
+      "sql_ms": 25.788999861106277,
+      "sql_calls": 9,
+      "gc_ms": 1.391800120472908,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 42.24330000579357,
+      "sql_ms": 24.94569995906204,
+      "sql_calls": 9,
+      "gc_ms": 1.055399829056114,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 41.527200024574995,
+      "sql_ms": 24.273500021081418,
+      "sql_calls": 9,
+      "gc_ms": 1.5197000466287136,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 41.645699995569885,
+      "sql_ms": 24.38859996618703,
+      "sql_calls": 9,
+      "gc_ms": 1.4751999406144023,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 82.44669996201992,
+      "sql_ms": 27.13260008022189,
+      "sql_calls": 9,
+      "gc_ms": 38.75770018203184,
+      "gc_collections": 16
+    },
+    {
+      "total_ms": 44.654899975284934,
+      "sql_ms": 25.67149989772588,
+      "sql_calls": 9,
+      "gc_ms": 1.2805000296793878,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 44.56359997857362,
+      "sql_ms": 26.07909997459501,
+      "sql_calls": 9,
+      "gc_ms": 1.6513000009581447,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 43.363000033423305,
+      "sql_ms": 25.7190999109298,
+      "sql_calls": 9,
+      "gc_ms": 1.4709000242874026,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 42.260500020347536,
+      "sql_ms": 25.121800019405782,
+      "sql_calls": 9,
+      "gc_ms": 1.238000055309385,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 41.86589998425916,
+      "sql_ms": 24.906600126996636,
+      "sql_calls": 9,
+      "gc_ms": 1.0234999936074018,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 41.276499978266656,
+      "sql_ms": 24.17109999805689,
+      "sql_calls": 9,
+      "gc_ms": 1.4932999620214105,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 42.01220005052164,
+      "sql_ms": 24.75289994617924,
+      "sql_calls": 9,
+      "gc_ms": 1.4109999174252152,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 42.2526000184007,
+      "sql_ms": 24.629700114019215,
+      "sql_calls": 9,
+      "gc_ms": 1.3290999922901392,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 79.52670002123341,
+      "sql_ms": 24.96619994053617,
+      "sql_calls": 9,
+      "gc_ms": 38.45940000610426,
+      "gc_collections": 17
+    },
+    {
+      "total_ms": 40.7749000005424,
+      "sql_ms": 23.922800086438656,
+      "sql_calls": 9,
+      "gc_ms": 1.6000999021343887,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 41.7234999476932,
+      "sql_ms": 24.442499969154596,
+      "sql_calls": 9,
+      "gc_ms": 1.4166998444125056,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 40.805500000715256,
+      "sql_ms": 24.249599839095026,
+      "sql_calls": 9,
+      "gc_ms": 1.1699998867698014,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 41.35730001144111,
+      "sql_ms": 24.190500029362738,
+      "sql_calls": 9,
+      "gc_ms": 1.5989000676199794,
+      "gc_collections": 15
+    },
+    {
+      "total_ms": 42.813299980480224,
+      "sql_ms": 24.811400042381138,
+      "sql_calls": 9,
+      "gc_ms": 1.8392999190837145,
+      "gc_collections": 15
+    }
+  ],
+  "p50_ms": 42.24330000579357,
+  "p95_ms": 82.1775000076741,
+  "scope": "Serial local requests; GC callbacks observe process collections during each request, not exclusive route CPU time"
+}
