@@ -6,6 +6,8 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 import math
+import os
+import re
 import sqlite3
 import shutil
 import threading
@@ -200,6 +202,21 @@ def upload_loop(outbox, config):
                 STOP.wait(0.25)
 
 
+def configure_credentials(config, local_only=False):
+    config = dict(config)
+    config.pop('device_key', None)  # Never use a credential embedded in JSON.
+    if local_only:
+        return config
+    name = config.get('device_key_env', 'SAFETRACK_DEVICE_KEY_GATEWAY')
+    if not isinstance(name,str) or not re.fullmatch(r'SAFETRACK_DEVICE_KEY_[A-Z0-9_]{1,64}',name):
+        raise ValueError('Invalid device credential environment reference')
+    value = os.getenv(name,'')
+    if not 32 <= len(value) <= 256 or value != value.strip():
+        raise ValueError('Set the gateway device credential in its environment (32-256 characters)')
+    config['device_key'] = value
+    return config
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default=str(ROOT/'gateway.local.json'))
@@ -210,7 +227,7 @@ def main():
     parser.add_argument('--local-only', action='store_true', help='Accept and persist device records without cloud upload')
     parser.add_argument('--max-wifi-ingest', type=int, default=None, help='Stop after this many successful Wi-Fi requests')
     args = parser.parse_args()
-    config = json.loads(Path(args.config).read_text(encoding='utf-8-sig'))
+    config = configure_credentials(json.loads(Path(args.config).read_text(encoding='utf-8-sig')),args.local_only)
     bind = args.bind or config.get('lan_bind', '127.0.0.1')
     status_port = args.status_port or int(config.get('lan_port', 8765))
     if not config['cloud_url'].startswith('https://'):
