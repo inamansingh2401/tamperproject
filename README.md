@@ -139,6 +139,8 @@ The Phase 1 report now includes five interleaved repeat runs of both versions an
 
 Phase 3 keeps application caching off. [Signed-ingestion measurements](docs/benchmarks/phase3.md) include five interleaved revision-fence comparisons at concurrency 1/5/10/20 and five single/batch comparisons at concurrency 10. [System design](docs/ARCHITECTURE.md) documents bounded batching, idempotent retries, critical-event admission, offline custody, fleet extrapolations and sourced free-tier limits. Hosted throughput remains unmeasured.
 
+Phase 4 adds explicit strict-device replay protection, registration/revocation/rotation, stored-chain verification, bounded ingest parsing and backend-only database policies. See the [threat model and OWASP checklist](docs/SECURITY.md), [local verification results](docs/security/phase4-results.md), and [migration/enrollment guide](docs/security/rollout.md). Existing devices remain in compatibility mode until enrolled; firmware key epochs and authenticated gateway acknowledgments still need work. Caching stays **off**. All claims are local and software-signed; hosted Supabase behavior, hardware signing and Phase 4 throughput remain unmeasured.
+
 ## License
 
 This repository is a project prototype. Add an explicit license before redistributing it outside the team.

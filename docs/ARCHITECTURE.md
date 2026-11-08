@@ -22,11 +22,15 @@ The ESP32 signs exact event bytes and commits them before LAN delivery. Its Litt
 
 The gateway acknowledges only after signature verification and a durable SQLite commit. The device removes only the matching acknowledged record. Once accepted locally, cloud outages grow the gateway's disk outbox while the device can continue using the local link. The current gateway configuration binds one device and one shipment. It has not been converted into a multi-device gateway. Scaling to thousands of devices needs a gateway enrollment/routing design in addition to API capacity.
 
+That describes honest-gateway behavior: the current local acknowledgment is not authenticated, so an active network attacker or compromised gateway can forge it and induce device queue deletion. Cloud signature checks do not fix that custody gap. See [the security model and remaining firmware work](SECURITY.md).
+
 The gateway has a single FIFO uploader. Transient network failures, 408, 429 and 5xx responses retain the original event and schedule retries. Permanent configuration/enrollment failures are blocked for diagnosis. Archived history is not replayed automatically. Backlog survives software restart when the original outbox is retained. A free cloud host's ephemeral filesystem is unsuitable for this custody boundary.
 
 FastAPI verifies the credential and an enrolled device's P-256 signature before accepting data. The device and shipment row locks serialize conflicting writes. Unique event IDs and the original payload digest make identical retries acknowledge the existing record; changed identity/readings conflict. A batch holds one device/shipment pair, preserving the relative order of accepted records within its transaction.
 
 Hash-chain order is database insertion order. Displayed latest state uses capture/gateway time so delayed events cannot replace newer telemetry. Signed capture UTC depends on the device's clock. SNTP and unsigned gateway fallback time are not independent proof of accurate UTC. Enrollment keys and chain anchors require independent trust, and the system still has no external tail anchor.
+
+Phase 4 adds opt-in `counter_v1` devices: signed key epoch/boot counter/sequence and a transactional replay ledger, with bounded reordering and capture-age acceptance. Identical committed retries still return the original receipt; revocation/authentication remain enforced. Existing devices stay legacy until firmware/enrollment is ready. The additional write/storage cost is unmeasured; the following Phase 3 throughput results do not measure this stricter path. Gateway upload credentials now come from environment variables; see [rollout steps](security/rollout.md).
 
 ## Write-path measurements
 
