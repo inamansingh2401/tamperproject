@@ -1,0 +1,1896 @@
+{
+  "mode": "memory",
+  "high_churn": true,
+  "ttl_seconds": 5,
+  "schedule": "60 logical one-second ticks, two report reads/tick, one live read/tick, alerts every two ticks, shipment list every five ticks",
+  "ingest_schedule": "One event before every report",
+  "time_scope": "Logical schedule executed without wall-clock sleeps; latency is actual local elapsed time, not a throughput/load claim",
+  "cache_metrics": {
+    "enabled": true,
+    "backend": "MemoryTTLCache",
+    "ttl_seconds": 5,
+    "process_id": 11012,
+    "hits": 0,
+    "misses": 120,
+    "errors": 0,
+    "hit_rate": 0.0,
+    "scope": "Reports only; process-local counters. Authorization and revision reads are never cached."
+  },
+  "revision_writes": 120,
+  "summary": {
+    "alerts": {
+      "requests": 30,
+      "p50_ms": 4.377199977170676,
+      "p95_ms": 5.522900028154254,
+      "sql_calls": 60,
+      "mean_sql": 2
+    },
+    "ingest": {
+      "requests": 120,
+      "p50_ms": 9.67790000140667,
+      "p95_ms": 11.429399950429797,
+      "sql_calls": 1224,
+      "mean_sql": 10.2
+    },
+    "live": {
+      "requests": 60,
+      "p50_ms": 4.136100003961474,
+      "p95_ms": 4.836599982809275,
+      "sql_calls": 180,
+      "mean_sql": 3
+    },
+    "report": {
+      "requests": 120,
+      "p50_ms": 17.20280002336949,
+      "p95_ms": 18.579100025817752,
+      "sql_calls": 1080,
+      "mean_sql": 9
+    },
+    "shipments": {
+      "requests": 12,
+      "p50_ms": 5.68929995642975,
+      "p95_ms": 6.552400009240955,
+      "sql_calls": 24,
+      "mean_sql": 2
+    },
+    "report_miss": {
+      "requests": 120,
+      "p50_ms": 17.20280002336949,
+      "p95_ms": 18.579100025817752,
+      "mean_sql": 9
+    }
+  },
+  "total_sql": 2568,
+  "raw_requests": [
+    {
+      "kind": "ingest",
+      "ms": 20.783299987670034,
+      "sql": 12
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.115199985913932,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.452000038232654,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.90670003881678,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.510800004936755,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 6.346800015307963,
+      "sql": 2
+    },
+    {
+      "kind": "shipments",
+      "ms": 6.438599957618862,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 11.213199992198497,
+      "sql": 12
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.934300005435944,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.730800007469952,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.642700007651,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.6116000157780945,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.939800016582012,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.966500028502196,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.67790000140667,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.93009998416528,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.755400004796684,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.73380001494661,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.802999964449555,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.05600001150742,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.5621999935247,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.64580003125593,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.8844000082463026,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.799499996006489,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.301400017458946,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.610100009012967,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.366500047501177,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.011300043202937,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 5.154800019226968,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.590899979230016,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.896699951961637,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.81870002578944,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.910000005736947,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.025299975182861,
+      "sql": 3
+    },
+    {
+      "kind": "shipments",
+      "ms": 6.552400009240955,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.508199979085475,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.706100014038384,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.42610000493005,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.77180000115186,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.422400030307472,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.727299965452403,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.577899996656924,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.010000010486692,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 11.09129999531433,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 15.94640000257641,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.542699956800789,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.916700004599988,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.729999963194132,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 7.379800023045391,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.02189998468384,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.44769999012351,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.240399983245879,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.880899975541979,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.363500013947487,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.806499980390072,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.88460004515946,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.920899995137006,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.432199982460588,
+      "sql": 12
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.45510001294315,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.747000003699213,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.434800032991916,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.205500008538365,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.9504999769851565,
+      "sql": 2
+    },
+    {
+      "kind": "shipments",
+      "ms": 6.110999966040254,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 11.47349999519065,
+      "sql": 12
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.725299985613674,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 11.05559995630756,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.910200044047087,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 5.217000027187169,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.241399984806776,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.804799998179078,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 11.733399995137006,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.43290001852438,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.18560003163293,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.377199977170676,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.558400022797287,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.697200004477054,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.460900026373565,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.31539999693632,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.841000016313046,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.346399980131537,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.44469999196008,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.803500015754253,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.34240003861487,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.358100006356835,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.351900017354637,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 7.661200012080371,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.960999986622483,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.73580003483221,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 15.992000000551343,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.355400044005364,
+      "sql": 3
+    },
+    {
+      "kind": "shipments",
+      "ms": 5.684399977326393,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.391699975822121,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.653699964284897,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.834399981424212,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.692099976353347,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.848399966955185,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.879400017671287,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.317099989857525,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.1276000328362,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.007600008975714,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.379799984861165,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.5839000483974814,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.585200004745275,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.07540003210306,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.676699992269278,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.6352999988012,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.902599972207099,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 3.872699977364391,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.00079996790737,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.89030000893399,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.256199991796166,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.249899963848293,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.274100007023662,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 12.344199989456683,
+      "sql": 12
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.244999984744936,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.204300051555037,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.26179994875565,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.6951000220142305,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 3.6711999564431608,
+      "sql": 2
+    },
+    {
+      "kind": "shipments",
+      "ms": 5.68929995642975,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 11.001300008501858,
+      "sql": 12
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.436099995393306,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.576799977570772,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.42509996984154,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.226899996865541,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.54149995232001,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.823100031819195,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.748199965339154,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 15.840799955185503,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.524600051809102,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.081599996425211,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.577400003559887,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.70820004073903,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.292900038417429,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.64009998785332,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.8207999896258116,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.812799991574138,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.487599980086088,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.91769997542724,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.67269999254495,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.114699957426637,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.371499991975725,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.081800002604723,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.000499996356666,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.666099980473518,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.93159999558702,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.9177999715320766,
+      "sql": 3
+    },
+    {
+      "kind": "shipments",
+      "ms": 6.391100003384054,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.841000020969659,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.281899974681437,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.125799977686256,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.59849995141849,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.193700035102665,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.787399957422167,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.267099947668612,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.840999993495643,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.693100000731647,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.999100033193827,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.299799969885498,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.683399974368513,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.888399994466454,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.834300017450005,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.02049996331334,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.9142000023275614,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 3.81949997972697,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 7.194800011347979,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 15.892399998847395,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.977800004184246,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.169300001114607,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.182500008028001,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.063900030218065,
+      "sql": 12
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.20280002336949,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.228500002995133,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.05450000008568,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.136100003961474,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.077199962921441,
+      "sql": 2
+    },
+    {
+      "kind": "shipments",
+      "ms": 5.28189999749884,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 12.058400025125593,
+      "sql": 12
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.457400041166693,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.982400002423674,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.16409997222945,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 2.9569999896921217,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 7.4362000450491905,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.97599998442456,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.725600004661828,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.579100025817752,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.5222999867983162,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 3.882499993778765,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 7.154899998567998,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.470000020693988,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.762599995359778,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.78090001223609,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.163900041021407,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 7.662300020456314,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.615799977444112,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.529300034046173,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.491500020492822,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.185400030110031,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 5.048299964983016,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.336499973665923,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.091400000732392,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.322899986524135,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.371199977584183,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.175300011411309,
+      "sql": 3
+    },
+    {
+      "kind": "shipments",
+      "ms": 4.73970000166446,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.552899980917573,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.8606000370346,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.501299995463341,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.120399978011847,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.1470000287517905,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.281700006686151,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.81259999005124,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.82339998660609,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.915800008457154,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.708999977912754,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.5204000305384398,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 7.060899981297553,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.833100002259016,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.414499974809587,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.163599957711995,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.4271999611519277,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.490199964493513,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.221700030844659,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 15.655900002457201,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.38300001528114,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.083199996501207,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.370199992787093,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.33580000512302,
+      "sql": 12
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.541399993002415,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.035700011532754,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.647999979089946,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.539499990642071,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.1803999920375645,
+      "sql": 2
+    },
+    {
+      "kind": "shipments",
+      "ms": 5.120099987834692,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.410500002559274,
+      "sql": 12
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.40290003363043,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.703399973455817,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.628800018224865,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.569900000002235,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.592600039672107,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.25470002181828,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.625200007576495,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.773700004909188,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 5.45390002662316,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 5.522900028154254,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.543900018092245,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.62969995616004,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.374000004958361,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 19.057099998462945,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.119599994737655,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.822600007988513,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.45619997382164,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.35489998664707,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.196600034367293,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.836599982809275,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 5.344700010027736,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.053199959453195,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.71270001679659,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 11.227899987716228,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.595799999777228,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.2369000148028135,
+      "sql": 3
+    },
+    {
+      "kind": "shipments",
+      "ms": 5.960000038612634,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.406100037973374,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.731200041249394,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.884499955456704,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.073400016874075,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.8137000519782305,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.330000025220215,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 11.44679996650666,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.465399996377528,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.769299951381981,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.199299996718764,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.3058000155724585,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.05719997920096,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.909099998883903,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.102999989409,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.51109999511391,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.696400031913072,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 3.9456000085920095,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.265500015113503,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.397399991750717,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.317300002090633,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.38360001379624,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.0197999915108085,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.834600030444562,
+      "sql": 12
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.08870002767071,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.274100000970066,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.211000027600676,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.060600011143833,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.712599969934672,
+      "sql": 2
+    },
+    {
+      "kind": "shipments",
+      "ms": 5.318800045643002,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 11.155200016219169,
+      "sql": 12
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.03119998658076,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.508499992080033,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.011100018862635,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.90549999428913,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.294299980159849,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.184500000439584,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.358500014059246,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.608400026801974,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.605200025252998,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.551000020001084,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.883700044360012,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.67089998954907,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.514099976513535,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.31239999551326,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.7265000282786787,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 7.986599986907095,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.931499984115362,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.134500007145107,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.261200002394617,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.44770000083372,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.119699995499104,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.59790002182126,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.3555000112392,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.747200005222112,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.70500000566244,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.473100008908659,
+      "sql": 3
+    },
+    {
+      "kind": "shipments",
+      "ms": 5.93390001449734,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 10.184300015680492,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.792799975723028,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.739300003275275,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.08010000968352,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.128499946091324,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.470599989872426,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.708199999295175,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 18.636699998751283,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.900400007609278,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 16.252300003543496,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.2415999923832715,
+      "sql": 3
+    },
+    {
+      "kind": "ingest",
+      "ms": 8.814700006041676,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 15.94050001585856,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 11.429399950429797,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.206899996381253,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 3.8981999969109893,
+      "sql": 3
+    },
+    {
+      "kind": "alerts",
+      "ms": 4.752799984999001,
+      "sql": 2
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.717500011902303,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 15.763900009915233,
+      "sql": 9
+    },
+    {
+      "kind": "ingest",
+      "ms": 9.70760005293414,
+      "sql": 10
+    },
+    {
+      "kind": "report",
+      "outcome": "miss",
+      "ms": 17.230400000698864,
+      "sql": 9
+    },
+    {
+      "kind": "live",
+      "ms": 4.025300033390522,
+      "sql": 3
+    }
+  ]
+}

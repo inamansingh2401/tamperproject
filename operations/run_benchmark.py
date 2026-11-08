@@ -24,6 +24,8 @@ def main():
     parser.add_argument('--force-serial', action='store_true', help='Diagnostic report transactions only')
     parser.add_argument('--index-profile', action='store_true')
     parser.add_argument('--verify-migrations', action='store_true')
+    parser.add_argument('--cache-mix', choices=['off','memory'])
+    parser.add_argument('--high-churn', action='store_true')
     parser.add_argument('--output', type=Path, default=ROOT/'docs/benchmarks/baseline.md')
     args = parser.parse_args()
     if not 100000 <= args.events <= 500000:
@@ -62,13 +64,16 @@ def main():
                 for arguments in (['upgrade','head'], ['check'], ['downgrade','base']):
                     run([sys.executable,'-m','alembic','-c',str(ROOT/'alembic.ini'),*arguments], migration_env)
                 from verify_concurrent_index import verify
-                verify(migration_url, ROOT/'docs/benchmarks/concurrent-index.json')
+                verify(migration_url, args.output.parent/'concurrent-index.json')
                 legacy_env = dict(env, DATABASE_URL=url)
                 run([sys.executable,str(ROOT/'operations/check_migration_schema.py')], legacy_env)
                 for arguments in (['stamp','head'], ['upgrade','head'], ['check']):
                     run([sys.executable,'-m','alembic','-c',str(ROOT/'alembic.ini'),*arguments], legacy_env)
                 print('PASS: PostgreSQL fresh upgrade/downgrade and existing-schema adoption')
-            if args.index_profile:
+            if args.cache_mix:
+                from benchmark_cache import measure
+                measure(url,args.output,args.cache_mix,args.high_churn)
+            elif args.index_profile:
                 from profile_evidence_index import profile
                 profile(url,args.output,args.samples)
             elif args.reports_profile:
