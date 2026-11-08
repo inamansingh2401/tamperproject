@@ -133,6 +133,8 @@ Phase 0 provides a repeatable local PostgreSQL baseline using 100,000 synthetic 
 
 The fixture contains legacy hash-linked records without device signatures. Its measurements cover local read performance. Hosted latency, hardware signing costs and optimization gains require separate measurements. Existing JWT access checks, gateway signature checks and evidence-verification regressions remain part of the validation suite.
 
+Phase 1 removes alert/shipment N+1 queries, adds cursor pagination for alerts, aggregates report scans, and adds one measured evidence-cursor index through Alembic. The [Phase 1 comparison](docs/benchmarks/phase1.md) includes full-history alert timings, slower endpoints, before/after index plans, and migration/deployment instructions.
+
 ## License
 
 This repository is a project prototype. Add an explicit license before redistributing it outside the team.

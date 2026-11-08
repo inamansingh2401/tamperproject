@@ -1,5 +1,7 @@
 # Reproducing the Phase 0 baseline
 
+The original Phase 0 artifacts correspond to commit 6d108ca. Use that revision in a separate checkout to reproduce the original implementation. For the current Phase 1 implementation, run with --output docs/benchmarks/phase1-run.md and follow [the Phase 1 report](phase1.md). Supplying a separate output path preserves the original baseline.
+
 Run from the repository root using Python and PostgreSQL 18 installed locally.
 
 ```powershell
