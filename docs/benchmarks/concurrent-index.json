@@ -1,0 +1,7 @@
+{
+  "second_insert_ms": 2.2752000368200243,
+  "statement_timeout_ms": 1500,
+  "observed_phase": "waiting for writers before build",
+  "index_valid": true,
+  "scope": "Disposable local PostgreSQL; one held writer and one additional insert during CREATE INDEX CONCURRENTLY"
+}

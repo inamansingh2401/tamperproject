@@ -61,6 +61,8 @@ def main():
                 migration_env = dict(env, DATABASE_URL=migration_url)
                 for arguments in (['upgrade','head'], ['check'], ['downgrade','base']):
                     run([sys.executable,'-m','alembic','-c',str(ROOT/'alembic.ini'),*arguments], migration_env)
+                from verify_concurrent_index import verify
+                verify(migration_url, ROOT/'docs/benchmarks/concurrent-index.json')
                 legacy_env = dict(env, DATABASE_URL=url)
                 run([sys.executable,str(ROOT/'operations/check_migration_schema.py')], legacy_env)
                 for arguments in (['stamp','head'], ['upgrade','head'], ['check']):

@@ -55,7 +55,10 @@ def main():
     if not args.restore_from:
         environment.update(PGHOST=connection.host, PGPORT=str(connection.port or 5432),
                            PGUSER=connection.username, PGPASSWORD=connection.password or '',
-                           PGDATABASE=connection.database or 'postgres', PGSSLMODE='require')
+                           PGDATABASE=connection.database or 'postgres',
+                           PGSSLMODE=connection.query.get('sslmode', environment.get('PGSSLMODE', 'require')))
+        if connection.query.get('sslrootcert'):
+            environment['PGSSLROOTCERT'] = connection.query['sslrootcert']
         run([str(args.pg_bin/'pg_dump.exe'), '--schema=public', '--format=custom', '--no-owner', '--no-acl', '--file',str(backup)], environment)
     manifest = run([str(args.pg_bin/'pg_restore.exe'), '--list',str(backup)], environment)
     result = {'backup':str(backup),'bytes':backup.stat().st_size,'archive_readable':bool(manifest),'restore':'NOT TESTED','verified_at':stamp}

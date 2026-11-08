@@ -1,5 +1,6 @@
 """Check fresh install and legacy adoption without touching application records."""
 import os
+import io
 from pathlib import Path
 import tempfile
 import unittest
@@ -14,6 +15,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class MigrationTests(unittest.TestCase):
+    def test_postgresql_index_ddl_is_concurrent_and_outside_transaction(self):
+        with patch.dict(os.environ, DATABASE_URL='postgresql+psycopg://localhost/offline_only'):
+            output = io.StringIO()
+            config = Config(str(ROOT/'alembic.ini'), output_buffer=output)
+            command.upgrade(config, '0001_existing_schema:0002_evidence_cursor_index', sql=True)
+            sql = output.getvalue()
+            self.assertIn('COMMIT;', sql)
+            self.assertIn('CREATE INDEX CONCURRENTLY ix_events_shipment_id', sql)
+            output = io.StringIO()
+            config = Config(str(ROOT/'alembic.ini'), output_buffer=output)
+            command.downgrade(config, '0002_evidence_cursor_index:0001_existing_schema', sql=True)
+            self.assertIn('DROP INDEX CONCURRENTLY ix_events_shipment_id', output.getvalue())
+
     def test_empty_database_upgrade_check_and_downgrade(self):
         with tempfile.TemporaryDirectory() as directory:
             url = 'sqlite:///' + (Path(directory)/'migration.db').as_posix()
