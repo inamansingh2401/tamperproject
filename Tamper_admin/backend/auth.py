@@ -43,4 +43,4 @@ def create_access_token(data: dict, expires_delta: Optional[datetime.timedelta] 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def decode_access_token(token: str) -> dict:
-    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM],options={'require':['exp','sub']})

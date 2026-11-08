@@ -55,6 +55,16 @@ class SecurityTests(unittest.TestCase):
     def test_read_requires_login(self):
         self.assertEqual(self.client.get("/api/shipments").status_code, 401)
 
+    def test_jwt_rejects_wrong_algorithm_and_missing_expiry(self):
+        import jwt
+        import auth
+        for token in (jwt.encode({'sub':'admin','role':'admin'},None,algorithm='none'),
+                      jwt.encode({'sub':'admin','role':'admin'},auth.SECRET_KEY,algorithm='HS384'),
+                      jwt.encode({'sub':'admin','role':'admin'},auth.SECRET_KEY,algorithm='HS256')):
+            response = self.client.get('/api/shipments',headers={'Authorization':'Bearer '+token})
+            self.assertEqual(response.status_code,401,response.text)
+            self.assertNotIn(token,response.text)
+
     def test_role_and_shipment_boundaries(self):
         self.assertEqual(self.client.get("/api/users", headers=self.user_headers).status_code, 403)
         self.assertEqual(self.client.get("/api/shipments/PRCL-2024-05-21-002", headers=self.user_headers).status_code, 403)
