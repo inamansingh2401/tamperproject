@@ -1,5 +1,7 @@
 # Phase 2 report caching
 
+Current Phase 3 operating decision: keep REPORT_CACHE_BACKEND=off everywhere. The single-pair cache timings below are historical diagnostics, not five-run validated improvement claims. Do not enable caching as part of the current rollout.
+
 Reports is the only cached endpoint. Dashboard summary, live telemetry, evidence, Alerts and shipment listing continue to query the database. Shipment listing already uses two SQL calls including authorization. An authoritative freshness check would use that same two-call floor, so no shipment-list SQL saving is established.
 
 Caching is opt-in using REPORT_CACHE_BACKEND=memory. The default is off. The standard-library memory backend has a five-second TTL, a 32-entry bound and defensive copies. A small get/put interface also has an optional Redis adapter. Redis and hosted Supabase cache performance are unmeasured.
@@ -84,7 +86,7 @@ Follow the [Supabase backup and concurrent-index rollout](../SUPABASE_ROLLOUT.md
 
 The application backend must own that table or have explicitly reviewed SELECT/INSERT/UPDATE grants and RLS policies for it. Browser anon/authenticated roles must not receive access. The normal database-owner backend connection can use the table without a new policy.
 
-Deploy all API writer processes with cache reads still off. Verify ordinary ingestion, alert changes, report reads and the metrics endpoint. Then opt in to memory caching if the observed read/write mix supports hits. Direct maintenance writers must follow the freshness contract above. Keep Reports serial-execution tuning marked as local and unverified on hosted Supabase.
+Deploy all API writer processes with cache reads off. Verify ordinary ingestion, alert changes, report reads and the metrics endpoint. Keep caching off for Phase 3. Direct maintenance writers must follow the freshness contract above. Keep Reports serial-execution tuning marked as local and unverified on hosted Supabase.
 
 If an earlier deployment already auto-created cache_revisions, do not blindly run CREATE TABLE again or stamp past unexplained differences. Run python operations/check_migration_schema.py, confirm the table's RLS and browser-role revocations, and review the existing schema before stamping 0003_report_cache_revision.
 

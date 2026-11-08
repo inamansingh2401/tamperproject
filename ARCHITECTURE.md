@@ -1,5 +1,7 @@
 # SafeTrack architecture map
 
+For Phase 3 API contracts, measured write capacity, offline custody and sourced cloud limits, see [the current system-design document](docs/ARCHITECTURE.md). Application caching remains off.
+
 ## Scope and repository selection
 
 This map covers the authoritative Git repository `tamperproject/`. The adjacent workspace directory the archived workspace snapshot is a legacy snapshot outside this repository and is not an active source tree. Generated firmware artifacts, local databases, credentials, logs, and deployment metadata are intentionally excluded.

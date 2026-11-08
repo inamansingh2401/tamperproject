@@ -133,7 +133,7 @@ SELECT has_table_privilege('anon','public.cache_revisions','SELECT') AS anon_sel
 
 Expected values are true for relrowsecurity and false for both browser privileges. The migration owner should own the table. A separate application backend role needs reviewed table privileges and an RLS policy allowing that role to read and update the reports revision. Do not solve a backend-role permission error by granting browser-role access.
 
-Deploy the new API to every writer process with caching off. Verify ingestion, alert resolution and GET /api/admin/cache-metrics using an admin session. Then set REPORT_CACHE_BACKEND=memory and REPORT_CACHE_TTL_SECONDS=5 on the API host, redeploy and check that the metrics report enabled=true. Check a new event followed immediately by report, alert and live reads.
+Deploy the new API to every writer process with caching off. Verify ingestion, alert resolution and GET /api/admin/cache-metrics using an admin session. The current Phase 3 operating decision is to keep REPORT_CACHE_BACKEND=off and require enabled=false in those metrics. Do not enable caching during this rollout. Check a new event followed immediately by report, alert and live reads.
 
 For cache rollback, first set REPORT_CACHE_BACKEND=off and restart every worker. To remove the revision table, deploy the Phase 1 API to every writer before running the following command with this release's migration tools.
 
