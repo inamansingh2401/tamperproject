@@ -328,6 +328,13 @@ class DeviceAssignmentPayload(BaseModel):
     public_key: str = Field(min_length=128, max_length=130, pattern=r'^[a-fA-F0-9]+$')
     confirm_drained: bool = False
 
+class DeviceEnrollmentPayload(DeviceAssignmentPayload):
+    model_config = ConfigDict(extra='forbid')
+    api_key_env: str = Field(pattern=r'^SAFETRACK_DEVICE_KEY_[A-Z0-9_]{1,64}$', max_length=85)
+
+class DeviceRegistrationPayload(DeviceEnrollmentPayload):
+    device_id: str = Field(min_length=1,max_length=64,pattern=r'^[A-Za-z0-9_.:-]+$')
+
 
 class VehicleAssignShipmentPayload(BaseModel):
     shipment_code: str
@@ -426,7 +433,62 @@ def require_admin(current_user: User = Depends(get_current_user)):
 @app.get('/api/devices')
 def list_devices(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     return [{'device_id': d.device_id, 'status': d.status, 'shipment_code': d.shipment_code,
-             'signature_enrolled': bool(d.public_key)} for d in db.query(Device).order_by(Device.device_id)]
+             'signature_enrolled': bool(d.public_key), 'key_version': d.key_version,
+             'replay_policy': d.replay_policy} for d in db.query(Device).order_by(Device.device_id)]
+
+
+def enrollment_material(payload, db):
+    if not db.query(Shipment).filter_by(shipment_code=payload.shipment_code).first():
+        raise HTTPException(404, 'Shipment not found')
+    value = os.getenv(payload.api_key_env, '')
+    if not 32 <= len(value) <= 256 or value != value.strip():
+        raise HTTPException(422, 'Provision an environment credential of 32-256 characters without outer whitespace')
+    try:
+        _, point = public_point(payload.public_key)
+    except Exception:
+        raise HTTPException(422, 'Invalid P-256 public key')
+    return hashlib.sha256(value.encode()).hexdigest(), point
+
+
+@app.post('/api/devices')
+def register_device(payload: DeviceRegistrationPayload, db: Session = Depends(get_db),
+                    current_user: User = Depends(require_admin)):
+    if db.query(Device).filter(Device.device_id.ilike(payload.device_id)).first():
+        raise HTTPException(409, 'Device already registered')
+    digest,point = enrollment_material(payload, db)
+    db.add(Device(device_id=payload.device_id,api_key='',key_hash=digest,public_key=point,
+        shipment_code=payload.shipment_code,replay_policy='counter_v1'))
+    db.commit()
+    return {'device_id':payload.device_id,'key_version':1,'replay_policy':'counter_v1'}
+
+
+@app.post('/api/devices/{device_id}/revoke')
+def revoke_device(device_id: str, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    device = db.query(Device).filter_by(device_id=device_id).with_for_update().first()
+    if not device:
+        raise HTTPException(404, 'Device not found')
+    device.status = 'revoked'
+    db.commit()
+    return {'device_id':device_id,'status':'revoked'}
+
+
+@app.post('/api/devices/{device_id}/rotate')
+def rotate_device(device_id: str, payload: DeviceEnrollmentPayload, db: Session = Depends(get_db),
+                  current_user: User = Depends(require_admin)):
+    device = db.query(Device).filter_by(device_id=device_id).with_for_update().first()
+    if not device:
+        raise HTTPException(404, 'Device not found')
+    if not payload.confirm_drained:
+        raise HTTPException(409, 'Pause sampling and drain queues before rotation')
+    digest,point = enrollment_material(payload, db)
+    if key_matches(device, os.environ[payload.api_key_env]):
+        raise HTTPException(409, 'Provision a different credential for rotation')
+    device.api_key, device.key_hash, device.public_key = '', digest, point
+    device.key_version += 1
+    device.replay_boot, device.replay_policy = 0, 'counter_v1'
+    device.shipment_code, device.status = payload.shipment_code, 'active'
+    db.commit()
+    return {'device_id':device_id,'key_version':device.key_version,'replay_policy':'counter_v1'}
 
 
 @app.put('/api/devices/{device_id}/assignment')

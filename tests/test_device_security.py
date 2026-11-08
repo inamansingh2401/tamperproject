@@ -91,3 +91,57 @@ class DeviceSecurityTests(unittest.TestCase):
         self.assertEqual(self.post(self.signed(key_version=2)).status_code,409)
         self.assertEqual(self.post(self.signed(boot_counter=20)).status_code,200)
         self.assertEqual(self.post(self.signed(boot_counter=1,sequence=2)).status_code,409)
+
+    def admin(self):
+        response = self.client.post('/api/auth/login',json={'username':'admin',
+            'password':os.environ['BOOTSTRAP_ADMIN_PASSWORD']})
+        self.assertEqual(response.status_code,200,response.text)
+        return {'Authorization':'Bearer '+response.json()['access_token']}
+
+    def test_revocation_rejects_even_known_retry(self):
+        body = self.signed()
+        self.assertEqual(self.post(body).status_code,200)
+        self.assertEqual(self.client.post('/api/devices/'+self.name+'/revoke',headers=self.admin()).status_code,200)
+        self.assertEqual(self.post(body).status_code,401)
+
+    def test_registration_rotation_and_old_signature(self):
+        from unittest.mock import patch
+        # Replace fixture enrollment via the actual registration route.
+        with SessionLocal() as db:
+            db.query(Device).filter_by(device_id=self.name).delete()
+            db.commit()
+        admin = self.admin()
+        new_secret = secrets.token_urlsafe(40)
+        payload = dict(device_id=self.name,shipment_code=self.name,public_key=self.point,
+            api_key_env='SAFETRACK_DEVICE_KEY_TEST')
+        with patch.dict(os.environ,SAFETRACK_DEVICE_KEY_TEST=self.secret):
+            response = self.client.post('/api/devices',json=payload,headers=admin)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertNotIn(self.secret,response.text)
+        old = self.signed()
+        self.assertEqual(self.post(old).status_code,200)
+        new_key = ec.generate_private_key(ec.SECP256R1())
+        point = new_key.public_key().public_bytes(serialization.Encoding.X962,
+            serialization.PublicFormat.UncompressedPoint).hex()
+        rotation = {k:v for k,v in payload.items() if k!='device_id'}
+        rotation.update(public_key=point)
+        with patch.dict(os.environ,SAFETRACK_DEVICE_KEY_TEST=new_secret):
+            path = '/api/devices/'+self.name+'/rotate'
+            self.assertEqual(self.client.post(path,json=rotation,headers=admin).status_code,409)
+            response = self.client.post(path,json={**rotation,'confirm_drained':True},headers=admin)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()['key_version'],2)
+        self.assertEqual(self.post(old).status_code,401)
+        self.headers = {'x-device-key':new_secret}
+        self.assertEqual(self.post(old).status_code,422)  # Old signer rejected even with new bearer key.
+        self.key = new_key
+        self.assertEqual(self.post(self.signed(key_version=2)).status_code,200)
+        with SessionLocal() as db:
+            device = db.query(Device).filter_by(device_id=self.name).one()
+            self.assertEqual(device.api_key,'')
+            self.assertNotEqual(device.key_hash,new_secret)
+
+    def test_lifecycle_requires_admin_and_environment_namespace(self):
+        payload = dict(device_id=self.name,shipment_code=self.name,public_key=self.point,api_key_env='JWT_SECRET')
+        self.assertEqual(self.client.post('/api/devices',json=payload).status_code,401)
+        self.assertEqual(self.client.post('/api/devices',json=payload,headers=self.admin()).status_code,422)
