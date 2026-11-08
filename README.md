@@ -4,11 +4,31 @@
 
 SafeTrack is a **team project** for shipment-condition monitoring, with ESP32-S3 sensing, ATECC508A-signed telemetry, a durable Python gateway and a PostgreSQL evidence ledger.
 
+- **Purpose:** monitor shipment conditions and investigate light exposure, shock and temperature incidents.
+- **Evidence:** retain original signed records and a per-shipment hash chain for integrity verification.
+- **Platform:** ESP32-S3 → gateway with SQLite outbox → FastAPI → PostgreSQL → Admin/User dashboards.
+- **Validation:** measured locally with synthetic data and software signatures; hardware and hosted acceptance remain separate.
+
 ![Admin dashboard](docs/screenshots/admin-dashboard.png)
 
 [Performance](#performance) · [Security](#security) · [Testing](#testing) · [Status and limitations](#status-and-limitations) · [Rollout](docs/ROLLOUT.md)
 
 TrackSure is a shipment-security and condition-monitoring platform. It records environmental and motion data at the parcel, cryptographically signs each accepted record, preserves a hash-linked evidence trail, and presents the verified shipment state in separate Admin and User dashboards.
+
+## Engineering updates
+
+| Area | Changes included in this repository |
+| --- | --- |
+| Reproducible baseline | Deterministic PostgreSQL seed, endpoint latency measurements, SQL call instrumentation and actual query plans. |
+| Database performance | Removed Alerts/Shipment list N+1 queries, added cursor pagination, aggregated Reports queries and introduced a plan-justified evidence index through Alembic. |
+| Optional caching | Reports cache interface, transactional revision invalidation and admin-only metrics. Caching remains **OFF by default**; Alerts and live telemetry remain uncached. |
+| Ingestion reliability | Bounded batch ingestion, stable event identities for retries, duplicate prevention and per-device/IP admission limits with an authenticated critical-event lane. |
+| Device security | Explicit strict replay protection, environment-provisioned device credentials, admin registration/revocation/rotation and stored-chain verification. Existing devices retain compatibility mode until deliberately upgraded. |
+| API and database boundaries | Bounded fields/request bodies, sanitized validation errors, explicit CORS, security headers and browser-role isolation policies with local PostgreSQL tests. |
+| Dependency maintenance | Updated the declared cryptography range to include the tested version and patched audited Python and frontend build dependencies. |
+| Documentation and operations | Architecture, threat model, OWASP checklist, benchmark evidence, verification records, changelog and ordered migration/rollout/rollback guides. |
+
+Performance results and verification limits are documented below. The final-code ingestion experiment is incomplete; no final strict-device throughput or overhead claim is made. Publishing source does not establish that a deployment has applied its migrations, configuration or enrollment prerequisites. Existing login accounts, passwords and JWT secrets were not changed by this work.
 
 ## Start here
 
@@ -98,6 +118,20 @@ Implemented controls include signed-device verification, explicit strict replay 
 Existing devices retain compatibility mode. Strict protection requires compatible firmware plus enrollment; it is not silently enabled. Historical signatures preserve their original public keys, while externally retained checkpoints are needed to detect deleted history suffixes. A compromised gateway can forge the current local ACK, and privileged operators can delete history.
 
 See [the threat model, OWASP covered/partly/not-covered checklist and audits](docs/SECURITY.md), [local evidence](docs/benchmarks/verification.json), and [rollout guide](docs/ROLLOUT.md). Hardware signing and hosted policy behavior remain unverified. Existing login accounts, passwords and configured JWT secret are not changed by this documentation/benchmark update.
+
+### API additions
+
+| Method and route | Purpose | Access |
+| --- | --- | --- |
+| `POST /api/events` | Single-event ingestion with retry-safe event identity. | Active device credential; enrolled devices also require a valid signature. |
+| `POST /api/events/batch` | Bounded multi-event ingestion with individual results. | Device authentication and one device/shipment pair per batch. |
+| `POST /api/devices` | Register a device using an environment credential reference and reviewed public key. | Admin. |
+| `POST /api/devices/{device_id}/revoke` | Reject subsequent uploads from a revoked device. | Admin. |
+| `POST /api/devices/{device_id}/rotate` | Rotate credentials/key epoch after draining queues. | Admin. |
+| `GET /api/shipments/{code}/evidence/verify` | Verify stored evidence and report the first broken link; supports external completeness checkpoints. | Admin. |
+| `GET /api/admin/cache-metrics` | Inspect Reports cache state and hit/miss counters. | Admin. |
+
+Strict replay policy requires compatible signed epoch, boot counter, sequence and capture-time fields. Assignment-only public-key binding is not strict-policy activation. See the [rollout guide](docs/ROLLOUT.md) for the migration sequence, enrollment requirements and rollback implications.
 
 ## Prototype scope and production roadmap
 

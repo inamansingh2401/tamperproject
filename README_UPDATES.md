@@ -2,7 +2,7 @@
 
 SafeTrack is a team shipment-monitoring project connecting ESP32-S3 sensors, signing firmware, a durable gateway, FastAPI, PostgreSQL and Admin/User dashboards. This file summarizes the local improvements; the [main README](README.md) retains the project overview, screenshot and team attribution.
 
-**These additions have not been pushed or deployed by this work. Hosted Supabase, existing login accounts, passwords and JWT secrets remain unchanged.**
+**Source publication and production deployment are separate. Hosted migrations and production acceptance have not been performed by this work. Existing login accounts, passwords and JWT secrets have not been changed.**
 
 ## System architecture
 
