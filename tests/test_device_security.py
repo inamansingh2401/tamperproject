@@ -87,6 +87,7 @@ class DeviceSecurityTests(unittest.TestCase):
         self.assertEqual(self.post(good).status_code,200)  # Rolled-back nonce was not consumed.
 
     def test_missing_epoch_and_old_boot_are_rejected(self):
+        self.assertEqual(self.post(self.signed(device_id=self.name.lower())).status_code,403)
         self.assertEqual(self.post(self.signed(key_version=None)).status_code,422)
         self.assertEqual(self.post(self.signed(key_version=2)).status_code,409)
         self.assertEqual(self.post(self.signed(boot_counter=20)).status_code,200)

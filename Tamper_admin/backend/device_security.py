@@ -19,7 +19,9 @@ def key_matches(device, provided):
 def check_replay(db, device, data):
     if device.replay_policy != 'counter_v1':
         return  # Explicit legacy compatibility, not a replay-protection claim.
-    if not data.signed_envelope or not data.event_id or any(
+    if data.device_id != device.device_id:
+        raise HTTPException(403, 'Strict device identity must match enrollment exactly')
+    if not device.public_key or not data.signed_envelope or not data.event_id or any(
         getattr(data, name, None) is None for name in ('key_version','boot_counter','sequence','captured_at_ms')
     ):
         raise HTTPException(422, 'Strict device requires signed epoch, boot counter, sequence and capture timestamp')
