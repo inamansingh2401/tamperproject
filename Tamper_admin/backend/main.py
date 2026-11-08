@@ -7,6 +7,8 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import func, inspect, or_, text
 from sqlalchemy.orm import Session
@@ -20,6 +22,7 @@ from report_cache import report_cache
 from ingest_limits import from_environment as ingestion_limits_from_environment
 from device_security import check_replay, key_matches
 from chain_verifier import verify_shipment
+from ingest_guard import IngestBodyLimit
 
 ingest_limits = ingestion_limits_from_environment()
 
@@ -34,6 +37,8 @@ ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", ",".join([
     "http://localhost:5500", "http://localhost:5501",
     "http://127.0.0.1:5500", "http://127.0.0.1:5501", "http://127.0.0.1:5511", "http://127.0.0.1:5512", "http://localhost:5512",
 ])).split(",")
+if any('*' in origin or not origin.strip().startswith(('http://','https://')) for origin in ALLOWED_ORIGINS):
+    raise RuntimeError('CORS_ORIGINS must contain explicit HTTP(S) origins, without wildcards')
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in ALLOWED_ORIGINS if origin.strip()],
@@ -41,6 +46,14 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type", "X-Device-Key", "Idempotency-Key"],
 )
+app.add_middleware(IngestBodyLimit)
+
+
+@app.exception_handler(RequestValidationError)
+async def safe_validation_errors(request, exc):
+    # Pydantic's default errors echo input values, including body credentials.
+    return JSONResponse(status_code=422,content={'detail':[
+        {'loc':list(error['loc']), 'type':error['type'], 'msg':'Invalid value'} for error in exc.errors()]})
 
 SEAL_TAMPER_LUX_THRESHOLD = 800.0
 DEMO_RESET = os.getenv("DEMO_RESET", "false").lower() == "true"
@@ -56,6 +69,9 @@ async def security_headers(request: Request, call_next):
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["X-Frame-Options"] = "DENY"
+    response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    if request.url.scheme == 'https':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000'
     return response
 
 # Ensure Tables exist
@@ -273,14 +289,15 @@ class GPSSensorIngestPayload(BaseModel):
             if not all(math.isfinite(v) for v in value) or not 0.9 < norm < 1.1:
                 raise ValueError('Orientation must be a unit quaternion')
         return value
-    model_config = ConfigDict(extra="allow", allow_inf_nan=False, str_max_length=512)
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, str_max_length=512)
     event_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
     device_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")
     shipment_code: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")
     temperature: float = Field(ge=-100, le=150)
     humidity: float = Field(ge=0, le=100)
     warehouse_location: str = Field(default="Rewari Transit Hub, HR", max_length=128)
-    device_key: Optional[str] = None
+    device_key: Optional[str] = Field(default=None,max_length=256,repr=False)
+    api_key: Optional[str] = Field(default=None,max_length=256,repr=False)
     signed_envelope: Optional[dict] = None
     gateway_received_at: Optional[datetime] = None
     captured_at_ms: Optional[int] = Field(default=None, ge=1700000000000, le=4102444800000)
@@ -289,28 +306,52 @@ class GPSSensorIngestPayload(BaseModel):
     sequence: Optional[int] = Field(default=None, ge=0, le=4294967295)
 
     # Flexible Light Ingest (supports both lux and raw ADC readings)
-    light_lux: Optional[float] = None
+    light_lux: Optional[float] = Field(default=None,ge=0,le=1000000000)
     ldr_raw: Optional[float] = Field(default=None, ge=0, le=4095)
 
     # Accelerometer (supports scalar accel_g and 3-axis readings)
-    accel_g: Optional[float] = None
-    accel_x_g: Optional[float] = None
-    accel_y_g: Optional[float] = None
-    accel_z_g: Optional[float] = None
+    accel_g: Optional[float] = Field(default=None,ge=0,le=10000)
+    accel_x_g: Optional[float] = Field(default=None,ge=-10000,le=10000)
+    accel_y_g: Optional[float] = Field(default=None,ge=-10000,le=10000)
+    accel_z_g: Optional[float] = Field(default=None,ge=-10000,le=10000)
 
     # Gyroscope (supports scalar gyro_dps and 3-axis readings)
-    gyro_dps: Optional[float] = None
-    gyro_x_dps: Optional[float] = None
-    gyro_y_dps: Optional[float] = None
-    gyro_z_dps: Optional[float] = None
+    gyro_dps: Optional[float] = Field(default=None,ge=0,le=100000)
+    gyro_x_dps: Optional[float] = Field(default=None,ge=-100000,le=100000)
+    gyro_y_dps: Optional[float] = Field(default=None,ge=-100000,le=100000)
+    gyro_z_dps: Optional[float] = Field(default=None,ge=-100000,le=100000)
 
     # Shock and hardware diagnostics
-    shock_reading_g: Optional[float] = None
+    shock_reading_g: Optional[float] = Field(default=None,ge=0,le=10000)
     shock_detected: Optional[bool] = None
     mpu_available: Optional[bool] = None
     mpu_read_ok: Optional[bool] = None
+    boot_id: Optional[str] = Field(default=None,max_length=64)
+    uptime_ms: Optional[int] = Field(default=None,ge=0,le=4294967295)
+    clock_source: Optional[str] = Field(default=None,max_length=32)
+    firmware_version: Optional[str] = Field(default=None,max_length=64)
+    signature_status: Optional[str] = Field(default=None,max_length=64)
+    temperature_age_ms: Optional[int] = Field(default=None,ge=0,le=4294967295)
+    light_measurement_kind: Optional[str] = Field(default=None,max_length=64)
+    shock_axis_mode: Optional[str] = Field(default=None,max_length=32)
+
+    @field_validator('signed_envelope')
+    @classmethod
+    def bounded_envelope(cls, value):
+        if value is not None:
+            SignedEnvelope.model_validate(value)
+        return value
+
+
+class SignedEnvelope(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    record_b64: str = Field(min_length=1,max_length=10924)
+    signature_b64: str = Field(min_length=88,max_length=88)
+    signature_algorithm: Optional[str] = Field(default=None,pattern=r'^ECDSA_P256_SHA256$')
+    key_slot: Optional[int] = Field(default=None,ge=0,le=15)
 
 class BatchIngestPayload(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     events: List[GPSSensorIngestPayload] = Field(min_length=1,max_length=100)
 
 
@@ -1422,7 +1463,9 @@ def ingest_batch(request: Request, data: BatchIngestPayload, response: Response,
 def normalized_ingest(data):
     # Preserve pre-Phase-4 retry digests when new optional metadata is absent.
     excluded = {'signed_envelope', 'gateway_received_at', 'device_key', 'api_key'}
-    excluded.update(name for name in ('key_version','boot_counter','sequence')
+    excluded.update(name for name in ('key_version','boot_counter','sequence','boot_id','uptime_ms',
+                    'clock_source','firmware_version','signature_status','temperature_age_ms',
+                    'light_measurement_kind','shock_axis_mode')
                     if getattr(data, name, None) is None)
     return data.model_dump(mode='json', exclude=excluded)
 
@@ -1487,14 +1530,10 @@ def _ingest_event(request, data, x_device_key, db, commit=True):
 
     is_shock = (data.shock_detected is True) or (effective_accel >= 3.0)
 
-    # LIVE PRINT STATEMENT FOR TERMINAL LOGGING (Real Hardware Inspection)
-    print(f"\n [ESP32 LIVE READINGS] Device: {data.device_id} | Shipment: {data.shipment_code} | Temp: {data.temperature}°C | Humidity: {data.humidity}% | Light: {effective_light:.0f} {light_unit} ({'LIGHT DETECTED' if is_light_detected else 'NO LIGHT'}) | Accel: {effective_accel}g (X={ax}, Y={ay}, Z={az}) | Gyro: {effective_gyro}°/s | Pitch: {pitch_deg}° | Roll: {roll_deg}° | Shock: {is_shock}\n")
-
     device = db.query(Device).filter(Device.device_id == data.device_id, Device.status == "active").with_for_update().first()
     if not device:
         device = db.query(Device).filter(Device.device_id.ilike(data.device_id.strip()), Device.status == "active").with_for_update().first()
     if not device:
-        print(f"[AUTH ERROR] Device '{data.device_id}' not found in active devices table!")
         _ingest_auth_failure(request,401,f"Unknown or inactive device: {data.device_id}")
 
     provided_key = (
@@ -1512,7 +1551,6 @@ def _ingest_event(request, data, x_device_key, db, commit=True):
 
     if not key_matches(device, provided_key):
         # Do not put API keys, JWTs, or request headers into hosted logs.
-        print(f"[AUTH ERROR] Invalid key for device {data.device_id}")
         _ingest_auth_failure(request,401,"Invalid device key")
 
     idempotency_key = request.headers.get('Idempotency-Key')
