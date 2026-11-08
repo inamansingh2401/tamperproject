@@ -17,6 +17,9 @@ from auth import create_access_token, decode_access_token, get_password_hash, ve
 from auth import IS_PRODUCTION
 from evidence import canonical, public_point, verify_envelope, make_evidence, export_record, verify_record
 from report_cache import report_cache
+from ingest_limits import from_environment as ingestion_limits_from_environment
+
+ingest_limits = ingestion_limits_from_environment()
 
 # Initialize FastAPI App
 app = FastAPI(title="SafeTrack Unified Admin & Operations API", version="3.0.0")
@@ -1295,6 +1298,17 @@ def ingest_sensor_telemetry(request: Request, data: GPSSensorIngestPayload, x_de
     return _ingest_event(request,data,x_device_key,db)
 
 
+def _ingest_ip(request):
+    return request.client.host if request.client else 'unknown'
+
+
+def _ingest_auth_failure(request, code, detail):
+    retry = ingest_limits.failed_auth(_ingest_ip(request))
+    if retry:
+        raise HTTPException(429,'Authentication attempt rate exceeded',headers={'Retry-After':str(retry)})
+    raise HTTPException(code,detail)
+
+
 @app.post('/api/events/batch')
 def ingest_batch(request: Request, data: BatchIngestPayload, response: Response,
                  x_device_key: Optional[str] = Header(None), db: Session = Depends(get_db)):
@@ -1393,7 +1407,7 @@ def _ingest_event(request, data, x_device_key, db, commit=True):
         device = db.query(Device).filter(Device.device_id.ilike(data.device_id.strip()), Device.status == "active").with_for_update().first()
     if not device:
         print(f"[AUTH ERROR] Device '{data.device_id}' not found in active devices table!")
-        raise HTTPException(status_code=401, detail=f"Unknown or inactive device: {data.device_id}")
+        _ingest_auth_failure(request,401,f"Unknown or inactive device: {data.device_id}")
 
     provided_key = (
         x_device_key
@@ -1413,7 +1427,7 @@ def _ingest_event(request, data, x_device_key, db, commit=True):
     ):
         # Do not put API keys, JWTs, or request headers into hosted logs.
         print(f"[AUTH ERROR] Invalid key for device {data.device_id}")
-        raise HTTPException(status_code=401, detail="Invalid device key")
+        _ingest_auth_failure(request,401,"Invalid device key")
 
     idempotency_key = request.headers.get('Idempotency-Key')
     if idempotency_key is not None:
@@ -1441,9 +1455,9 @@ def _ingest_event(request, data, x_device_key, db, commit=True):
             source = signed
             signature_verified = True if device.public_key else None
         except Exception:
-            raise HTTPException(422, 'Invalid signature or signed readings mismatch')
+            _ingest_auth_failure(request,422,'Invalid signature or signed readings mismatch')
     elif device.public_key:
-        raise HTTPException(422, 'Enrolled device requires its signed envelope')
+        _ingest_auth_failure(request,422,'Enrolled device requires its signed envelope')
 
     if data.event_id:
         previous_event = db.query(SensorEvent).filter(SensorEvent.event_id == data.event_id).first()
@@ -1465,6 +1479,10 @@ def _ingest_event(request, data, x_device_key, db, commit=True):
 
     if device.shipment_code and device.shipment_code != data.shipment_code:
         raise HTTPException(403, 'Device is assigned to a different shipment')
+    retry = ingest_limits.telemetry(device.device_id,_ingest_ip(request),
+        critical=is_light_detected or is_shock or data.temperature>15.)
+    if retry:
+        raise HTTPException(429,'Ordinary telemetry rate exceeded',headers={'Retry-After':str(retry)})
     shipment = db.query(Shipment).filter(Shipment.shipment_code == data.shipment_code).with_for_update().first()
     if not shipment:
         raise HTTPException(status_code=404, detail="Shipment not found")

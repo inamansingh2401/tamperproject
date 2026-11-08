@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from database import engine, SessionLocal
 from models import Device, Shipment, SensorEvent, ShipmentAlert
 from evidence import export_record, verify_record
+from ingest_limits import IngestLimits
 import main
 import httpx
 
@@ -125,3 +126,37 @@ class IngestionFeatureTests(unittest.TestCase):
         for items in ([], [self.signed()]*101):
             self.assertEqual(self.client.post('/api/events/batch',json={'events':items},headers=self.headers).status_code,422)
         self.chain()
+
+    def test_ordinary_quotas_cannot_reject_critical_records_or_retries(self):
+        limits = IngestLimits(device_burst=1,ip_burst=1,failure_burst=1,clock=lambda:0)
+        with patch.object(main,'ingest_limits',limits):
+            first = self.signed()
+            accepted = self.client.post('/api/events',json=first,headers=self.headers)
+            self.assertEqual(accepted.status_code,200)
+            replay = self.client.post('/api/events',json=first,headers={**self.headers,'Idempotency-Key':first['event_id']})
+            self.assertTrue(replay.json()['duplicate'])
+            limited = self.client.post('/api/events',json=self.signed(),headers=self.headers)
+            self.assertEqual(limited.status_code,429)
+            self.assertGreater(int(limited.headers['Retry-After']),0)
+            for _ in range(2):
+                self.client.post('/api/events',json=self.signed(),headers={'x-device-key':'invalid-fixture-key'})
+            critical = self.signed(ldr_raw=0)
+            response = self.client.post('/api/events/batch',json={'events':[self.signed(),critical]},headers=self.headers)
+            self.assertEqual(response.status_code,207,response.text)
+            self.assertEqual([row['status_code'] for row in response.json()['results']],[429,200])
+        self.chain()
+
+
+class LimiterTests(unittest.TestCase):
+    def test_failed_auth_budget_and_shared_ip_do_not_block_critical_lane(self):
+        clock = [0.]
+        limits = IngestLimits(device_burst=1,ip_burst=2,failure_burst=1,clock=lambda:clock[0])
+        self.assertEqual(limits.failed_auth('shared'),0)
+        self.assertGreater(limits.failed_auth('shared'),0)
+        self.assertEqual(limits.telemetry('one','shared',False),0)
+        self.assertGreater(limits.telemetry('one','shared',False),0)
+        self.assertEqual(limits.telemetry('two','shared',False),0)
+        self.assertGreater(limits.telemetry('three','shared',False),0)
+        self.assertEqual(limits.telemetry('three','shared',True),0)
+        clock[0] += 1
+        self.assertEqual(limits.telemetry('three','shared',False),0)
