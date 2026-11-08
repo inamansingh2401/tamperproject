@@ -1,0 +1,1563 @@
+{
+  "policy": "rate",
+  "stored_events": 12,
+  "cache_backend": "off",
+  "test_policy": "0.01 events/sec, burst 2 per device/IP and failed-auth IP",
+  "critical_accepted": 10,
+  "status_counts": {
+    "critical": {
+      "200": 10
+    },
+    "invalid_auth": {
+      "401": 2,
+      "429": 8
+    },
+    "ordinary": {
+      "200": 2,
+      "429": 198
+    }
+  },
+  "raw_requests": [
+    {
+      "kind": "ordinary",
+      "status": 200,
+      "ms": 19.353499985300004,
+      "sql": 12,
+      "retry_after": null
+    },
+    {
+      "kind": "ordinary",
+      "status": 200,
+      "ms": 13.110900006722659,
+      "sql": 10,
+      "retry_after": null
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.852100031916052,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 8.798599999863654,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.833399995230138,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.0493000308051705,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.972800030373037,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.045400001108646,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.620200023055077,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.74709999980405,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.318499985150993,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.720999964978546,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.01379998261109,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.691400030627847,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 7.518899976275861,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 7.290799985639751,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.414100014604628,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.931900009978563,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.268900025635958,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.332200031261891,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.2708999826572835,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.2337999804876745,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.776400048285723,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.4716999982483685,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.022099998313934,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.195000045001507,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.319799947552383,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.330199968535453,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.06260002637282,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.611599994357675,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.473700002767146,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.407200009562075,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.758200004696846,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.9566000127233565,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.709400040563196,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.8611999955028296,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.02270000288263,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.610300005879253,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.039300012867898,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.507199977524579,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.604700021445751,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.263399983756244,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.682300030253828,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.87000000430271,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.6776999845169485,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.887200018856674,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.028500036336482,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.4907999583519995,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.603800014592707,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.353800021111965,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.464299989398569,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.906599991954863,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.899199993815273,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.284599970560521,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.359000013209879,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.4490999900735915,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.38709998363629,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.247899971436709,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.1518999971449375,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.1870999741368,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.725400009192526,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.818899964448065,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.260400008410215,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.087499961722642,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.345900008454919,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.761599983088672,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.157200026791543,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.3649999792687595,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.883300036657602,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.9691999815404415,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.422500009648502,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 7.517400023061782,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.264699972234666,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.605500016827136,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 8.266499964520335,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.883100024424493,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.302300025708973,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.75020000198856,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.999300046823919,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.6591000175103545,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 63.650599971879274,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 7.423100003506988,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.992099981289357,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.409600027836859,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.878800002392381,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.757800001651049,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.636300007812679,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.162800011225045,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 7.6722000376321375,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.948299997020513,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.955199991352856,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.0180999571457505,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.369000009726733,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.674400006886572,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 7.443899987265468,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.05079997330904,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.993700004182756,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.770099989604205,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.420799949206412,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.737099981866777,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.8040999681688845,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.339000024832785,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.744600017555058,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.119600031524897,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.905000027269125,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.749699950683862,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.670800048392266,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.964299954939634,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.2194999773055315,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.778800045140088,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.988600012846291,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 7.079300004988909,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.381500046700239,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.437400006689131,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.990000034216791,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 7.474199985153973,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.2889999826438725,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.612500001210719,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 7.377100002486259,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.234199972823262,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.83599996753037,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.94130001263693,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.192100001499057,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.24199997400865,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.112399976700544,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.889100022614002,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.811900027561933,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.011200021021068,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 6.017700012307614,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.676499975379556,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 5.342799995560199,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.472100001294166,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.955600015819073,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 4.759199975524098,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 10.301500034984201,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 14.246799983084202,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 8.520100032910705,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 7.888899999670684,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 8.435899973846972,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 7.167699979618192,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 8.834100037347525,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 9.97720001032576,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 9.3771000392735,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 8.829300000797957,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 9.365100006107241,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 7.5662999879568815,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 8.950599993113428,
+      "sql": 2,
+      "retry_after": "100"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 10.412400006316602,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 10.455099982209504,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 9.519900020677596,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 11.7032999987714,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 11.740399990230799,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 11.491900018882006,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 9.599600045476109,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 10.942100023385137,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 10.404100001323968,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 9.147799981292337,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 9.563100000377744,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 12.714300013612956,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 10.122800013050437,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 11.386899976059794,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 10.818200011271983,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 10.53999998839572,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 9.956999972928315,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 11.158899986185133,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 9.694500011391938,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 10.35210001282394,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 11.816699989140034,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 9.465699957218021,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 10.134499985724688,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 9.692999999970198,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 9.886600018944591,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 12.61149998754263,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 11.679899995215237,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 11.0765999997966,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 11.774799961131066,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 18.200699996668845,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 18.30189995234832,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 14.27079999120906,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 15.400299977045506,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 17.617199977394193,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 14.197800017427653,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 14.718000020366162,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 16.078700020443648,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 17.74069998646155,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 12.09590001963079,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 15.584599983412772,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 14.825799968093634,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 14.007399964611977,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 12.41279998794198,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 12.350100034382194,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 10.93129999935627,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 12.517400027718395,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 15.057000040542334,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 14.953400008380413,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 13.933599984738976,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 13.530800002627075,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 15.277600032277405,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 14.34500003233552,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "ordinary",
+      "status": 429,
+      "ms": 12.581599992699921,
+      "sql": 2,
+      "retry_after": "99"
+    },
+    {
+      "kind": "invalid_auth",
+      "status": 401,
+      "ms": 11.263600026722997,
+      "sql": 1,
+      "retry_after": null
+    },
+    {
+      "kind": "invalid_auth",
+      "status": 401,
+      "ms": 10.792799992486835,
+      "sql": 1,
+      "retry_after": null
+    },
+    {
+      "kind": "invalid_auth",
+      "status": 429,
+      "ms": 11.72680000308901,
+      "sql": 1,
+      "retry_after": "100"
+    },
+    {
+      "kind": "invalid_auth",
+      "status": 429,
+      "ms": 9.460599976591766,
+      "sql": 1,
+      "retry_after": "100"
+    },
+    {
+      "kind": "invalid_auth",
+      "status": 429,
+      "ms": 9.396900015417486,
+      "sql": 1,
+      "retry_after": "100"
+    },
+    {
+      "kind": "invalid_auth",
+      "status": 429,
+      "ms": 8.296000014524907,
+      "sql": 1,
+      "retry_after": "100"
+    },
+    {
+      "kind": "invalid_auth",
+      "status": 429,
+      "ms": 11.253500008024275,
+      "sql": 1,
+      "retry_after": "100"
+    },
+    {
+      "kind": "invalid_auth",
+      "status": 429,
+      "ms": 9.002999984659255,
+      "sql": 1,
+      "retry_after": "100"
+    },
+    {
+      "kind": "invalid_auth",
+      "status": 429,
+      "ms": 10.40379999903962,
+      "sql": 1,
+      "retry_after": "100"
+    },
+    {
+      "kind": "invalid_auth",
+      "status": 429,
+      "ms": 9.470799996051937,
+      "sql": 1,
+      "retry_after": "100"
+    },
+    {
+      "kind": "critical",
+      "status": 200,
+      "ms": 32.410999992862344,
+      "sql": 9,
+      "retry_after": null
+    },
+    {
+      "kind": "critical",
+      "status": 200,
+      "ms": 30.089100007899106,
+      "sql": 12,
+      "retry_after": null
+    },
+    {
+      "kind": "critical",
+      "status": 200,
+      "ms": 31.377699982840568,
+      "sql": 10,
+      "retry_after": null
+    },
+    {
+      "kind": "critical",
+      "status": 200,
+      "ms": 32.34510001493618,
+      "sql": 10,
+      "retry_after": null
+    },
+    {
+      "kind": "critical",
+      "status": 200,
+      "ms": 37.568200030364096,
+      "sql": 10,
+      "retry_after": null
+    },
+    {
+      "kind": "critical",
+      "status": 200,
+      "ms": 40.98600003635511,
+      "sql": 10,
+      "retry_after": null
+    },
+    {
+      "kind": "critical",
+      "status": 200,
+      "ms": 34.09600001759827,
+      "sql": 10,
+      "retry_after": null
+    },
+    {
+      "kind": "critical",
+      "status": 200,
+      "ms": 33.82200002670288,
+      "sql": 10,
+      "retry_after": null
+    },
+    {
+      "kind": "critical",
+      "status": 200,
+      "ms": 35.770899965427816,
+      "sql": 10,
+      "retry_after": null
+    },
+    {
+      "kind": "critical",
+      "status": 200,
+      "ms": 37.00730000855401,
+      "sql": 10,
+      "retry_after": null
+    }
+  ],
+  "scope": "Local real HTTP fault/admission diagnostic; counts are functional measurements, timing has no five-run noise bound"
+}

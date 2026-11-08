@@ -1,0 +1,1 @@
+{"stage": "API startup before timed requests", "case": "batch10-c10-r2", "detail": "Local API did not start; startup log reported PostgreSQL connection closure. No timed-request artifact exists for this failed case. Startup wait increased from 15 to 60 seconds before restarting the five paired runs."}
