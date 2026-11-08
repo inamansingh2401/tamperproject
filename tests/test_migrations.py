@@ -15,6 +15,33 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class MigrationTests(unittest.TestCase):
+    @unittest.skipUnless(os.getenv('SAFETRACK_TEST_DATABASE_URL'),'Requires disposable local PostgreSQL')
+    def test_postgresql_fresh_security_migrations(self):
+        from database import engine as app_engine
+        import secrets
+        from sqlalchemy.engine import make_url
+        self.assertIn(app_engine.url.host,('localhost','127.0.0.1'))
+        self.assertEqual(app_engine.url.database,'safetrack_test')
+        name = 'safetrack_migration_' + secrets.token_hex(6)
+        migration_url = app_engine.url.set(database=name)
+        with app_engine.connect().execution_options(isolation_level='AUTOCOMMIT') as owner:
+            owner.execute(text('CREATE DATABASE '+name))
+            try:
+                with patch.dict(os.environ,DATABASE_URL=migration_url.render_as_string(hide_password=False)):
+                    config = Config(str(ROOT/'alembic.ini'))
+                    command.upgrade(config,'head')
+                    command.check(config)
+                    probe = create_engine(migration_url)
+                    try:
+                        with probe.connect() as connection:
+                            self.assertIn('device_replay_nonces',inspect(connection).get_table_names())
+                            self.assertEqual(connection.execute(text("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON c.relnamespace=n.oid WHERE n.nspname='public' AND c.relkind='r' AND NOT c.relrowsecurity")).scalar(),0)
+                    finally:
+                        probe.dispose()
+                    command.downgrade(config,'0003_report_cache_revision')
+            finally:
+                owner.execute(text('DROP DATABASE '+name+' WITH (FORCE)'))
+
     def test_postgresql_index_ddl_is_concurrent_and_outside_transaction(self):
         with patch.dict(os.environ, DATABASE_URL='postgresql+psycopg://localhost/offline_only'):
             output = io.StringIO()
