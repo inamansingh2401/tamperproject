@@ -19,6 +19,12 @@ def summarize(paths):
             values = [row[metric] for row in entries]
             result[name][metric] = dict(median=statistics.median(values),minimum=min(values),
                                         maximum=max(values),spread=max(values)-min(values),runs=values)
+    if 'alert_history' in runs[0]:
+        result['alerts_complete_history'] = {}
+        for metric in ('p50_ms','p95_ms'):
+            values = [run['alert_history'][metric] for run in runs]
+            result['alerts_complete_history'][metric] = dict(median=statistics.median(values),
+                minimum=min(values),maximum=max(values),spread=max(values)-min(values),runs=values)
     return result
 
 
@@ -44,6 +50,7 @@ def main():
             artifacts[label].append(output.with_suffix('.json'))
             print(f'Completed {label} run {number}/{args.runs}',flush=True)
     summary = {label:summarize(paths) for label, paths in artifacts.items()}
+    summary['phase0']['alerts_complete_history'] = summary['phase0']['/api/alerts']
     (directory/'summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8')
     print('Saved all raw samples and min/max spreads',flush=True)
 
