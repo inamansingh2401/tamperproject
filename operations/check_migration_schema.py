@@ -15,6 +15,7 @@ from database import DATABASE_URL
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline', action='store_true', help='Compare against 0001 before adopting legacy databases')
+    parser.add_argument('--phase1', action='store_true', help='Compare against revision 0002')
     args = parser.parse_args()
     if not os.environ.get('DATABASE_URL'):
         raise SystemExit('Set DATABASE_URL in the environment')
@@ -22,6 +23,8 @@ def main():
     try:
         metadata = MetaData()
         for table in target_metadata.sorted_tables:
+            if (args.baseline or args.phase1) and table.name == 'cache_revisions':
+                continue
             table.to_metadata(metadata)
         if args.baseline:
             table = metadata.tables['sensor_events']

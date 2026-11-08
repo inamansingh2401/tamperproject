@@ -16,6 +16,7 @@ from models import Device, SensorEvent, Shipment, ShipmentAlert, SystemSetting, 
 from auth import create_access_token, decode_access_token, get_password_hash, verify_password
 from auth import IS_PRODUCTION
 from evidence import canonical, public_point, verify_envelope, make_evidence, export_record, verify_record
+from report_cache import report_cache
 
 # Initialize FastAPI App
 app = FastAPI(title="SafeTrack Unified Admin & Operations API", version="3.0.0")
@@ -1218,6 +1219,11 @@ def change_admin_password(payload: ChangePasswordPayload, db: Session = Depends(
 
 @app.get("/api/reports/summary")
 def get_reports_summary(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    revision = report_cache.revision(db) if report_cache.enabled else None
+    if revision is not None:
+        cached = report_cache.get(revision)
+        if cached is not None:
+            return cached
     if db.bind.dialect.name == 'postgresql':
         # Measured parallel worker startup dominates this aggregate at 100k rows.
         # SET LOCAL ends with this request's transaction, including on errors.
@@ -1242,7 +1248,7 @@ def get_reports_summary(db: Session = Depends(get_db), current_user: User = Depe
     vehicle_statuses = [{'status': status, 'count': count} for status,count in
                         db.query(Vehicle.status,func.count(Vehicle.id)).group_by(Vehicle.status).order_by(Vehicle.status)]
 
-    return {
+    result = {
         "total_shipments": total_shipments,
         "total_vehicles": total_vehicles,
         "total_events": total_events,
@@ -1260,6 +1266,14 @@ def get_reports_summary(db: Session = Depends(get_db), current_user: User = Depe
         "tamper_alerts": tamper_alerts,
         "shock_alerts": shock_alerts
     }
+    if revision is not None:
+        report_cache.put(revision, result)
+    return result
+
+
+@app.get('/api/admin/cache-metrics')
+def cache_metrics(current_user: User = Depends(require_admin)):
+    return report_cache.metrics()
 
 
 def add_active_alert_once(db: Session, shipment: Shipment, vehicle_id: str, severity: str, alert_type: str, location: str, message: str):

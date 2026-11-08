@@ -1,6 +1,7 @@
 import datetime
 from sqlalchemy import (
     Boolean,
+    BigInteger,
     Column,
     DateTime,
     Float,
@@ -9,6 +10,9 @@ from sqlalchemy import (
     Index,
     String,
     Text,
+    text,
+    DDL,
+    event,
 )
 from database import Base
 from sqlalchemy.orm import relationship
@@ -129,3 +133,13 @@ class SystemSetting(Base):
     category = Column(String(64), nullable=False)
     key = Column(String(64), nullable=False)
     value = Column(Text, nullable=False)
+
+
+class CacheRevision(Base):
+    __tablename__ = 'cache_revisions'
+    namespace = Column(String(32), primary_key=True)
+    generation = Column(BigInteger, nullable=False, server_default=text('0'))
+
+
+event.listen(CacheRevision.__table__, 'after_create',
+             DDL('ALTER TABLE cache_revisions ENABLE ROW LEVEL SECURITY').execute_if(dialect='postgresql'))

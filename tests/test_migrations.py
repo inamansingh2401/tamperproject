@@ -53,6 +53,8 @@ class MigrationTests(unittest.TestCase):
             try:
                 legacy = MetaData()
                 for table in target_metadata.sorted_tables:
+                    if table.name == 'cache_revisions':
+                        continue
                     table.to_metadata(legacy)
                 table = legacy.tables['sensor_events']
                 for index in list(table.indexes):

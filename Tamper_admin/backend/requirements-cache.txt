@@ -1,0 +1,2 @@
+# Optional Redis adapter. In-memory caching uses the standard library.
+redis>=5,<8
